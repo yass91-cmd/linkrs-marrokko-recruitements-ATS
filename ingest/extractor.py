@@ -4,7 +4,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".jpg", ".jpeg", ".png"}
 MAX_FILE_SIZE_MB = 10
 
 
@@ -38,15 +38,18 @@ def extract_text(path: str) -> str:
         if extension == ".pdf":
             from ingest.pdf_reader import extract_text_from_pdf
             text = extract_text_from_pdf(path)
-        else:  # .docx
+        elif extension == ".docx":
             from ingest.docx_reader import extract_text_from_docx
             text = extract_text_from_docx(path)
+        else:  # .jpg, .jpeg, .png
+            from ingest.image_reader import extract_text_from_image
+            text = extract_text_from_image(path)
     except ExtractionError:
         raise
     except Exception as e:
         raise ExtractionError(f"Failed to read {path}: {e}") from e
 
-    if not text.strip():
+    if not text or not text.strip():
         raise ExtractionError(f"No text found in {path} (is it a scanned image?)")
 
     logger.info("Extracted %d characters", len(text))
@@ -56,7 +59,7 @@ def extract_text(path: str) -> str:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Extract text from a CV file (PDF or DOCX).")
+    parser = argparse.ArgumentParser(description="Extract text from a CV file (PDF, DOCX, or image).")
     parser.add_argument("path", help="Path to the CV file")
     args = parser.parse_args()
 
