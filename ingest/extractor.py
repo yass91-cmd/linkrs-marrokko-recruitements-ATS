@@ -30,9 +30,23 @@ def _validate_file(path: str) -> str:
     return extension
 
 
-def extract_text(path: str) -> str:
+def _detect_method(path: str, extension: str) -> str:
+    """Did we read a real text layer ('native') or must we OCR ('ocr')?"""
+    if extension in {".jpg", ".jpeg", ".png"}:
+        return "ocr"
+    if extension == ".pdf":
+        import pymupdf
+        doc = pymupdf.open(path)
+        native_chars = sum(len(page.get_text().strip()) for page in doc)
+        doc.close()
+        return "native" if native_chars >= 50 else "ocr"
+    return "native"  # docx
+
+
+def extract_text(path: str, with_method: bool = False):
     extension = _validate_file(path)
     logger.info("Extracting text from %s", path)
+    method = _detect_method(path, extension)
 
     try:
         if extension == ".pdf":
@@ -52,8 +66,8 @@ def extract_text(path: str) -> str:
     if not text or not text.strip():
         raise ExtractionError(f"No text found in {path} (is it a scanned image?)")
 
-    logger.info("Extracted %d characters", len(text))
-    return text
+    logger.info("Extracted %d characters (method=%s)", len(text), method)
+    return (text, method) if with_method else text
 
 
 if __name__ == "__main__":
