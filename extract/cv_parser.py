@@ -11,7 +11,6 @@ VALID_EMAIL = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 
 def clean_text(text: str) -> str:
-    """Cheap cleanup: strip RTL/LTR marks and collapse excess whitespace."""
     text = re.sub(r"[\u200e\u200f\u202a-\u202e]", "", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
@@ -39,33 +38,16 @@ Return ONLY a valid JSON object (no markdown, no commentary) with EXACTLY these 
 }
 
 Rules:
-- Use null (or [] for lists) for anything missing.
-- Correct obvious OCR errors only when confident.
-- Keep skills as short, individual items.
-- Never invent information that is not in the text.
+- Use [] for missing lists and null for missing scalars.
 - Put each project (title + what it did) as one string in "projects".
+- Correct obvious OCR errors only when confident.
+- Never invent information that is not in the text.
 
 CV TEXT:
 \"\"\"
 {{CV_TEXT}}
 \"\"\"
 """
-
-
-def _call_llm(prompt: str, retries: int = 3) -> str:
-    """Call the model; retry on empty responses (free models blip sometimes)."""
-    for attempt in range(1, retries + 1):
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        content = response.choices[0].message.content
-        if content and content.strip():
-            return content
-        logger.warning("Empty LLM response (attempt %d/%d), retrying...", attempt, retries)
-        time.sleep(2)
-    raise ValueError("LLM returned an empty response after retries")
 
 
 def _extract_json(raw: str) -> dict:
@@ -77,6 +59,33 @@ def _extract_json(raw: str) -> dict:
     if not match:
         raise ValueError(f"No JSON found in LLM response: {raw[:300]!r}")
     return json.loads(match.group(0))
+
+
+def _get_structured(prompt: str, retries: int = 4) -> dict:
+    """Call the model and return parsed JSON; retry on empty OR unparseable output."""
+    messages = [
+        {"role": "system",
+         "content": "You are a strict JSON extraction API. Output ONLY one valid JSON object, nothing else."},
+        {"role": "user", "content": prompt},
+    ]
+    last_error = None
+    for attempt in range(1, retries + 1):
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0 if attempt == 1 else 0.3,   # vary on retries
+        )
+        content = response.choices[0].message.content or ""
+        if content.strip():
+            try:
+                return _extract_json(content)
+            except (ValueError, json.JSONDecodeError):
+                last_error = content.strip()[:120]
+                logger.warning("Non-JSON response (attempt %d/%d): %r", attempt, retries, last_error)
+        else:
+            logger.warning("Empty response (attempt %d/%d)", attempt, retries)
+        time.sleep(2)
+    raise ValueError(f"Failed to get JSON after {retries} attempts. Last output: {last_error!r}")
 
 
 def _validate_contact(candidate: Candidate, cleaned_text: str, source_is_ocr: bool) -> Candidate:
@@ -109,10 +118,7 @@ def _validate_contact(candidate: Candidate, cleaned_text: str, source_is_ocr: bo
 def parse_cv(text: str, source_is_ocr: bool = False) -> Candidate:
     cleaned = clean_text(text)
     prompt = PROMPT_TEMPLATE.replace("{{CV_TEXT}}", cleaned)
-
-    raw = _call_llm(prompt)
-    data = _extract_json(raw)
-
+    data = _get_structured(prompt)
     candidate = Candidate(**data)
     candidate = _validate_contact(candidate, cleaned, source_is_ocr)
     return candidate

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
@@ -24,7 +24,16 @@ class Candidate(BaseModel):
     languages: list[str] = Field(default_factory=list)
     education: list[Education] = Field(default_factory=list)
     experience: list[Experience] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
     years_experience: Optional[float] = None
     summary: Optional[str] = None
     warnings: list[str] = Field(default_factory=list)
-    projects: list[str] = Field(default_factory=list)
+
+    @field_validator(
+        "skills", "languages", "education", "experience", "projects", "warnings",
+        mode="before",
+    )
+    @classmethod
+    def none_to_list(cls, v):
+        # LLMs sometimes return null instead of [] — coerce it defensively.
+        return [] if v is None else v
