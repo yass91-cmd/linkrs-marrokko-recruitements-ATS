@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Erreur — CV Matcher{% endblock %}
+
+{% block content %}
+<h1>Nous n'avons pas pu analyser ce fichier</h1>
+<div class="card">
+  <p>{{ message }}</p>
+  <p style="margin-top:18px"><a class="btn" href="/">Réessayer</a></p>
+</div>
+{% endblock %}

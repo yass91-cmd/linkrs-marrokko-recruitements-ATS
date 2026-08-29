@@ -1,0 +1,63 @@
+{% extends "admin/_base_admin.html" %}
+{% block title %}Dashboard — Espace recruteur{% endblock %}
+{% block admin_content %}
+<h1>Espace recruteur</h1>
+
+<div class="metrics">
+  <div class="metric"><span class="label">Candidats</span><span class="value">{{ stats.candidates }}</span></div>
+  <div class="metric"><span class="label">Offres actives</span><span class="value">{{ stats.active_jobs }}</span></div>
+  <div class="metric"><span class="label">Matchs</span><span class="value">{{ stats.matches }}</span></div>
+  <div class="metric alert"><span class="label">À appeler (RH)</span><span class="value">{{ stats.pending_hr }}</span></div>
+</div>
+
+<div class="card">
+  <h2>Pipeline de recrutement</h2>
+  {% set stages = [("suggested","Suggéré"),("presented","Présenté"),("approved","Accepté"),
+                   ("applied","Candidature envoyée"),("hired","Recruté")] %}
+  <div class="funnel">
+    {% for key, label in stages %}
+    <div class="funnel-step">
+      <span class="n">{{ funnel.get(key, 0) }}</span>
+      <span class="s">{{ label }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Meilleurs matchs</h2>
+  {% if top %}
+  <table>
+    <thead><tr><th>Candidat</th><th>Poste</th><th>Entreprise</th><th>Score</th><th>Statut</th></tr></thead>
+    <tbody>
+      {% for t in top %}
+      <tr>
+        <td><a href="/admin/candidates/{{ t.candidate_id }}">{{ t.candidate }}</a></td>
+        <td>{{ t.job }}</td>
+        <td>{{ t.employer or "—" }}</td>
+        <td><span class="score {{ 'good' if t.llm_score >= 70 else '' }}">{{ t.llm_score }}</span></td>
+        <td><span class="pill">{{ t.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="hint">Aucun match éligible pour le moment.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Derniers CV reçus</h2>
+  <table>
+    <thead><tr><th>Nom</th><th>Titre</th><th>Source</th><th>Reçu le</th></tr></thead>
+    <tbody>
+      {% for r in recent %}
+      <tr>
+        <td><a href="/admin/candidates/{{ r.id }}">{{ r.name or "—" }}</a></td>
+        <td>{{ r.title or "—" }}</td>
+        <td><span class="pill {{ 'warn' if r.source_method == 'ocr' else '' }}">{{ r.source_method }}</span></td>
+        <td>{{ r.created_at.strftime("%d/%m/%Y") if r.created_at else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

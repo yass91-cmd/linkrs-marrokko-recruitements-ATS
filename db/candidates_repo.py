@@ -8,13 +8,28 @@ def save_candidate(candidate: Candidate, source_method: str, raw_text: str) -> i
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
+                        """
                 INSERT INTO candidates
                     (name, title, email, phone, location, skills, languages,
                      education, experience, projects, years_experience, summary,
                      warnings, source_method, raw_text)
                 VALUES
                     (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (email) WHERE email IS NOT NULL DO UPDATE SET
+                    name = EXCLUDED.name,
+                    title = EXCLUDED.title,
+                    phone = EXCLUDED.phone,
+                    location = EXCLUDED.location,
+                    skills = EXCLUDED.skills,
+                    languages = EXCLUDED.languages,
+                    education = EXCLUDED.education,
+                    experience = EXCLUDED.experience,
+                    projects = EXCLUDED.projects,
+                    years_experience = EXCLUDED.years_experience,
+                    summary = EXCLUDED.summary,
+                    warnings = EXCLUDED.warnings,
+                    source_method = EXCLUDED.source_method,
+                    raw_text = EXCLUDED.raw_text
                 RETURNING id;
                 """,
                 (

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Profil confirmé — CV Matcher{% endblock %}
+
+{% block content %}
+<h1>✅ Merci{% if name %}, {{ name }}{% endif %}</h1>
+<div class="card">
+  <p>Votre profil est enregistré. Nos recruteurs vous contacteront si un poste
+     néerlandophone correspond à votre expérience.</p>
+  <p style="margin-top:18px"><a class="btn" href="/">Retour à l'accueil</a></p>
+</div>
+{% endblock %}

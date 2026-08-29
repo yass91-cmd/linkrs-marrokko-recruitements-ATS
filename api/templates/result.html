@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Vérifiez votre profil — CV Matcher{% endblock %}
+
+{% block content %}
+<h1>Vérifiez votre profil</h1>
+<p class="lede">Nous avons analysé votre CV. Corrigez ce qui est inexact, puis confirmez.</p>
+
+{% if candidate.warnings %}
+<div class="warnings">
+  <strong>Certaines informations sont incertaines</strong>
+  <ul>{% for w in candidate.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  <p class="hint" style="margin:8px 0 0">Votre CV a été lu par reconnaissance d'image —
+     merci de vérifier surtout votre email et votre téléphone.</p>
+</div>
+{% endif %}
+
+<form action="/candidate/{{ candidate_id }}/update" method="post">
+  <div class="card">
+    <h2>Informations personnelles</h2>
+    <div class="grid2">
+      <label>Nom complet<input name="name" value="{{ candidate.name or '' }}"></label>
+      <label>Titre / poste<input name="title" value="{{ candidate.title or '' }}"></label>
+      <label>Email<input name="email" type="email" value="{{ candidate.email or '' }}"></label>
+      <label>Téléphone<input name="phone" value="{{ candidate.phone or '' }}"></label>
+      <label class="full">Localisation<input name="location" value="{{ candidate.location or '' }}"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Langues et compétences</h2>
+    <label>Langues <span class="hint">(une par ligne)</span>
+      <textarea name="languages" rows="4">{{ candidate.languages | join("\n") }}</textarea>
+    </label>
+    <label>Compétences <span class="hint">(une par ligne)</span>
+      <textarea name="skills" rows="8">{{ candidate.skills | join("\n") }}</textarea>
+    </label>
+  </div>
+
+  <div class="card">
+    <h2>Formation</h2>
+    {% for e in candidate.education %}
+    <div class="row3">
+      <label>Diplôme<input name="edu_degree" value="{{ e.degree or '' }}"></label>
+      <label>Établissement<input name="edu_institution" value="{{ e.institution or '' }}"></label>
+      <label>Année<input name="edu_year" value="{{ e.year or '' }}"></label>
+    </div>
+    {% endfor %}
+    <div class="row3">
+      <label>Diplôme<input name="edu_degree" placeholder="Ajouter…"></label>
+      <label>Établissement<input name="edu_institution"></label>
+      <label>Année<input name="edu_year"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Expérience professionnelle</h2>
+    {% for x in candidate.experience %}
+    <div class="row3">
+      <label>Poste<input name="exp_title" value="{{ x.title or '' }}"></label>
+      <label>Entreprise<input name="exp_company" value="{{ x.company or '' }}"></label>
+      <label>Période<input name="exp_duration" value="{{ x.duration or '' }}"></label>
+    </div>
+    {% endfor %}
+    <div class="row3">
+      <label>Poste<input name="exp_title" placeholder="Ajouter…"></label>
+      <label>Entreprise<input name="exp_company"></label>
+      <label>Période<input name="exp_duration"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Projets et résumé</h2>
+    <label>Projets <span class="hint">(un par ligne)</span>
+      <textarea name="projects" rows="6">{{ candidate.projects | join("\n") }}</textarea>
+    </label>
+    <label>Résumé
+      <textarea name="summary" rows="4">{{ candidate.summary or '' }}</textarea>
+    </label>
+  </div>
+
+  <p style="margin-top:24px">
+    <button class="btn" type="submit">Confirmer mon profil</button>
+  </p>
+</form>
+{% endblock %}

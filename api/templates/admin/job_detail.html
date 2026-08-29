@@ -1,0 +1,118 @@
+{% extends "admin/_base_admin.html" %}
+{% block title %}{{ j.title }} — Offre{% endblock %}
+
+{% block admin_content %}
+<p class="crumb"><a href="/admin/jobs">← Toutes les offres</a></p>
+<h1>{{ j.title }}</h1>
+<p class="lede">{{ j.employer or "Entreprise non précisée" }} · {{ j.city or "—" }}
+  {% if j.is_remote %}· télétravail{% endif %}</p>
+
+<div class="split">
+  <div>
+    <div class="card">
+      <h2>Données collectées <span class="hint">(source : offre en ligne)</span></h2>
+
+      {% if d.languages %}
+      <h3>Langues requises</h3>
+      <div class="tags">{% for l in d.languages %}<span class="tag">{{ l }}</span>{% endfor %}</div>
+      {% endif %}
+
+      <dl class="profile">
+        {% if d.contract_type %}<dt>Contrat</dt><dd>{{ d.contract_type }}</dd>{% endif %}
+        {% if d.experience_required %}<dt>Expérience</dt><dd>{{ d.experience_required }}</dd>{% endif %}
+        {% if d.schedule %}<dt>Horaires</dt><dd>{{ d.schedule }}</dd>{% endif %}
+        {% if d.salary %}<dt>Salaire annoncé</dt><dd>{{ d.salary }}</dd>{% endif %}
+      </dl>
+
+      {% if d.missions %}
+      <h3>Missions</h3>
+      <ul class="plain">{% for m in d.missions %}<li>{{ m }}</li>{% endfor %}</ul>
+      {% endif %}
+
+      {% if d.requirements %}
+      <h3>Exigences</h3>
+      <ul class="plain">{% for r in d.requirements %}<li>{{ r }}</li>{% endfor %}</ul>
+      {% endif %}
+
+      {% if d.benefits %}
+      <h3>Avantages</h3>
+      <ul class="plain">{% for b in d.benefits %}<li>{{ b }}</li>{% endfor %}</ul>
+      {% endif %}
+
+      <details style="margin-top:18px">
+        <summary class="hint">Voir la description brute</summary>
+        <pre class="raw">{{ j.description or "" }}</pre>
+      </details>
+
+      {% if j.apply_link %}
+      <p style="margin-top:16px"><a class="hint" href="{{ j.apply_link }}" target="_blank" rel="noopener">Voir l'offre d'origine ↗</a></p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div>
+    <div class="card hr-panel">
+      <h2>Suivi RH <span class="hint">(saisi par le recruteur)</span></h2>
+      <form action="/admin/jobs/{{ j.job_uid }}/hr" method="post">
+        <label class="check">
+          <input type="checkbox" name="hr_verified" {{ "checked" if j.hr_verified }}>
+          J'ai contacté l'entreprise
+        </label>
+        {% if j.hr_verified_at %}
+        <p class="hint">Vérifiée le {{ j.hr_verified_at.strftime("%d/%m/%Y") }}</p>
+        {% endif %}
+
+        <label>Salaire confirmé
+          <input name="hr_salary" value="{{ j.hr_salary or '' }}" placeholder="ex. 8000–9500 MAD net + primes">
+        </label>
+
+        <label>Notes de l'appel
+          <textarea name="hr_notes" rows="5" placeholder="Contact, urgence, nombre de postes…">{{ j.hr_notes or '' }}</textarea>
+        </label>
+
+        <label>Statut de l'offre
+          <select name="status">
+            {% for s in ["active","filled","expired","closed"] %}
+            <option value="{{ s }}" {{ "selected" if s == j.status }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>Note interne
+          <textarea name="note" rows="3">{{ j.note or '' }}</textarea>
+        </label>
+
+        <button class="btn" type="submit">Enregistrer</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Candidats évalués sur cette offre</h2>
+    <form action="/admin/jobs/{{ j.job_uid }}/match" method="post">
+      <input type="hidden" name="top" value="3">
+      <button class="btn" type="submit">🔍 Trouver des candidats</button>
+    </form>
+</div>
+  {% if not candidates %}
+    <p class="hint">Aucun candidat évalué. Le matching inverse (offre → candidats) arrive.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Candidat</th><th>Score</th><th>Éligible</th><th>Statut</th></tr></thead>
+    <tbody>
+      {% for c in candidates %}
+      <tr>
+        <td><a href="/admin/candidates/{{ c.candidate_id }}">{{ c.name }}</a>
+            <div class="hint">{{ c.title or "" }}</div></td>
+        <td><span class="score {{ 'good' if c.llm_score and c.llm_score >= 70 }}">{{ c.llm_score }}</span></td>
+        <td>{{ "✅" if c.eligible else "⛔" }}</td>
+        <td><span class="pill">{{ c.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

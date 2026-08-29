@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+<nav class="subnav">
+  <a href="/admin">Dashboard</a>
+  <a href="/admin/candidates">Candidats</a>
+  <a href="/admin/jobs">Offres</a>
+</nav>
+{% block admin_content %}{% endblock %}
+{% endblock %}

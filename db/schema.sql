@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 
     -- HR enrichment (workflow step 2)
     hr_verified      boolean NOT NULL DEFAULT false,
+    hr_verified_at   timestamptz,
     hr_salary        text,
     hr_notes         text,
 

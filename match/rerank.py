@@ -137,6 +137,23 @@ def rerank_for_candidate(candidate_id: int, top_n: int = 3):
         assessed.append(record)
     assessed.sort(key=lambda x: x["assessment"].score, reverse=True)
     return candidate, assessed
+def rerank_for_job(job_uid: str, top_n: int = 3):
+    """Retrieve the closest candidates for a job, then assess them with the LLM."""
+    from match.search import find_candidates_for_job
+
+    job, results = find_candidates_for_job(job_uid, limit=top_n)
+    assessed = []
+    for r in results:
+        try:
+            a = assess(r["candidate_id"], job_uid)
+        except Exception as e:
+            logger.warning("Assessment failed for candidate %s: %s", r["candidate_id"], e)
+            continue
+        record = {**r, "job_uid": job_uid, "assessment": a}
+        save_match(r["candidate_id"], job_uid, record)
+        assessed.append(record)
+    assessed.sort(key=lambda x: x["assessment"].score, reverse=True)
+    return job, assessed
 
 
 if __name__ == "__main__":

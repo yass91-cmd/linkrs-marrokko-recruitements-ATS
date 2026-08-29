@@ -1,0 +1,23 @@
+{% extends "admin/_base_admin.html" %}
+{% block title %}Candidats — Espace recruteur{% endblock %}
+
+{% block admin_content %}
+<h1>Candidats <span class="count">{{ rows | length }}</span></h1>
+<div class="card">
+  <table>
+    <thead><tr><th>Nom</th><th>Titre</th><th>Ville</th><th>Source</th><th>Matchs</th><th>Vecteur</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><a href="/admin/candidates/{{ r.id }}"><strong>{{ r.name or "—" }}</strong></a></td>
+        <td>{{ r.title or "—" }}</td>
+        <td>{{ r.location or "—" }}</td>
+        <td><span class="pill {{ 'warn' if r.source_method == 'ocr' else '' }}">{{ r.source_method }}</span></td>
+        <td>{{ r.n_matches }}</td>
+        <td>{{ "✅" if r.embedded else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

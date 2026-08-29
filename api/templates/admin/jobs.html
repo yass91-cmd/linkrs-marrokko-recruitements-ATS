@@ -1,0 +1,40 @@
+{% extends "admin/_base_admin.html" %}
+{% block title %}Offres — Espace recruteur{% endblock %}
+
+{% block admin_content %}
+<h1>Offres <span class="count">{{ rows | length }}</span></h1>
+
+<div class="filters">
+  <a href="/admin/jobs?filter=todo"     class="chip {{ 'on' if filter=='todo' }}">☎️ À appeler ({{ counts.todo }})</a>
+  <a href="/admin/jobs?filter=verified" class="chip {{ 'on' if filter=='verified' }}">✅ Vérifiées ({{ counts.verified }})</a>
+  <a href="/admin/jobs?filter=active"   class="chip {{ 'on' if filter=='active' }}">Actives ({{ counts.active }})</a>
+  <a href="/admin/jobs?filter=all"      class="chip {{ 'on' if filter=='all' }}">Toutes ({{ counts.all }})</a>
+</div>
+
+<div class="card">
+  {% if not rows %}<p class="hint">Aucune offre dans cette vue.</p>{% endif %}
+  {% if rows %}
+  <table>
+    <thead><tr>
+      <th>Poste</th><th>Entreprise</th><th>Ville</th><th>Langues</th>
+      <th>RH</th><th>Salaire</th><th>Statut</th><th>Matchs</th>
+    </tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><a href="/admin/jobs/{{ r.job_uid }}"><strong>{{ r.title }}</strong></a>
+            {% if r.is_remote %}<span class="pill">télétravail</span>{% endif %}</td>
+        <td>{{ r.employer or "—" }}</td>
+        <td>{{ r.city or "—" }}</td>
+        <td class="hint">{{ r.languages | join(", ") or "—" }}</td>
+        <td>{{ "✅" if r.hr_verified else "⏳" }}</td>
+        <td>{{ r.hr_salary or "—" }}</td>
+        <td><span class="pill">{{ r.status }}</span></td>
+        <td>{{ r.n_matches }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}
