@@ -56,3 +56,35 @@ CREATE TABLE IF NOT EXISTS jobs (
     last_seen_at     timestamptz DEFAULT now(),
     created_at       timestamptz DEFAULT now()
 );
+
+
+
+CREATE TABLE IF NOT EXISTS matches (
+    id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+
+    -- the pair (foreign keys enforce that both actually exist)
+    candidate_id     bigint NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+    job_uid          text   NOT NULL REFERENCES jobs(job_uid)  ON DELETE CASCADE,
+
+    -- assessment snapshot
+    similarity       real,                      -- stage 2: semantic score
+    llm_score        integer,                   -- stage 3: LLM score
+    verdict          text,
+    strengths        jsonb DEFAULT '[]'::jsonb,
+    gaps             jsonb DEFAULT '[]'::jsonb,
+    summary          text,
+    eligible         boolean,
+    blocking_reasons jsonb DEFAULT '[]'::jsonb,
+
+    -- workflow (your steps 3-6)
+    status           text NOT NULL DEFAULT 'suggested'
+                     CHECK (status IN ('suggested','presented','approved',
+                                       'declined','applied','hired','rejected')),
+    note             text,
+
+    -- audit
+    assessed_at      timestamptz DEFAULT now(),
+    updated_at       timestamptz DEFAULT now(),
+
+    UNIQUE (candidate_id, job_uid)
+);

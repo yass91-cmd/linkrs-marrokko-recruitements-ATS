@@ -8,6 +8,7 @@ from db.database import get_connection
 from extract.llm_json import get_structured
 from match.build_embeddings import candidate_to_text, job_to_text
 from match.search import find_jobs_for_candidate
+from match.matches_repo import save_match
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,19 @@ class MatchAssessment(BaseModel):
             return max(0, min(100, int(v)))
         except (TypeError, ValueError):
             return 0
+
+    @field_validator("verdict", mode="before")
+    @classmethod
+    def normalize_verdict(cls, v):
+        """The model sometimes answers in French; map to the canonical English labels."""
+        if not v:
+            return None
+        mapping = {
+            "strong": "strong", "fort": "strong", "forte": "strong", "élevé": "strong",
+            "moderate": "moderate", "modéré": "moderate", "modere": "moderate", "moyen": "moderate",
+            "weak": "weak", "faible": "weak",
+        }
+        return mapping.get(str(v).strip().lower(), str(v).strip().lower())
 
     @field_validator("strengths", "gaps", "summary", "verdict", mode="after")
     @classmethod
@@ -118,7 +132,9 @@ def rerank_for_candidate(candidate_id: int, top_n: int = 3):
         except Exception as e:
             logger.warning("Assessment failed for %s: %s", r["title"], e)
             continue
-        assessed.append({**r, "assessment": a})
+        record = {**r, "assessment": a}
+        save_match(candidate_id, r["job_uid"], record)
+        assessed.append(record)
     assessed.sort(key=lambda x: x["assessment"].score, reverse=True)
     return candidate, assessed
 
