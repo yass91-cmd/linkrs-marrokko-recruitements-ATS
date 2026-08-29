@@ -2,13 +2,30 @@
 {% block title %}Offres — Espace recruteur{% endblock %}
 
 {% block admin_content %}
-<h1>Offres <span class="count">{{ rows | length }}</span></h1>
+<div class="card-head">
+  <h1>Offres <span class="count">{{ rows | length }}</span></h1>
+    <form action="/admin/jobs/collect" method="post"
+        onsubmit="this.querySelector('button').disabled = true;
+                  this.querySelector('button').textContent = '⏳ Collecte en cours…';">
+    <button class="btn" type="submit">⬇️ Collecter les offres</button>
+  </form>
+</div>
+
+{% if checked >= 0 %}
+<div class="banner">
+  ✅ Collecte terminée — {{ checked }} offres vérifiées auprès de l'API,
+  <strong>{{ added }}</strong> nouvelle{{ "s" if added != 1 }} enregistrée{{ "s" if added != 1 }}.
+  {% if added == 0 %}Aucune nouveauté : toutes les offres publiées sont déjà dans votre base.{% endif %}
+</div>
+{% endif %}
 
 <div class="filters">
-  <a href="/admin/jobs?filter=todo"     class="chip {{ 'on' if filter=='todo' }}">☎️ À appeler ({{ counts.todo }})</a>
-  <a href="/admin/jobs?filter=verified" class="chip {{ 'on' if filter=='verified' }}">✅ Vérifiées ({{ counts.verified }})</a>
-  <a href="/admin/jobs?filter=active"   class="chip {{ 'on' if filter=='active' }}">Actives ({{ counts.active }})</a>
-  <a href="/admin/jobs?filter=all"      class="chip {{ 'on' if filter=='all' }}">Toutes ({{ counts.all }})</a>
+  <a href="/admin/jobs?filter=recent"    class="chip {{ 'on' if filter=='recent' }}">🆕 Nouvelles ({{ counts.recent }})</a>
+  <a href="/admin/jobs?filter=todo"      class="chip {{ 'on' if filter=='todo' }}">☎️ À appeler ({{ counts.todo }})</a>
+  <a href="/admin/jobs?filter=unmatched" class="chip {{ 'on' if filter=='unmatched' }}">Sans candidats ({{ counts.unmatched }})</a>
+  <a href="/admin/jobs?filter=verified"  class="chip {{ 'on' if filter=='verified' }}">✅ Vérifiées ({{ counts.verified }})</a>
+  <a href="/admin/jobs?filter=active"    class="chip {{ 'on' if filter=='active' }}">Actives ({{ counts.active }})</a>
+  <a href="/admin/jobs?filter=all"       class="chip {{ 'on' if filter=='all' }}">Toutes ({{ counts.all }})</a>
 </div>
 
 <div class="card">
@@ -17,13 +34,16 @@
   <table>
     <thead><tr>
       <th>Poste</th><th>Entreprise</th><th>Ville</th><th>Langues</th>
-      <th>RH</th><th>Salaire</th><th>Statut</th><th>Matchs</th>
+      <th>RH</th><th>Salaire</th><th>Statut</th><th>Matchs</th><th>Vue le</th>
     </tr></thead>
     <tbody>
       {% for r in rows %}
-      <tr>
-        <td><a href="/admin/jobs/{{ r.job_uid }}"><strong>{{ r.title }}</strong></a>
-            {% if r.is_remote %}<span class="pill">télétravail</span>{% endif %}</td>
+      <tr class="{{ 'row-new' if r.is_new }}">
+        <td>
+          {% if r.is_new %}<span class="badge-new">NOUVEAU</span>{% endif %}
+          <a href="/admin/jobs/{{ r.job_uid }}"><strong>{{ r.title }}</strong></a>
+          {% if r.is_remote %}<span class="pill">télétravail</span>{% endif %}
+        </td>
         <td>{{ r.employer or "—" }}</td>
         <td>{{ r.city or "—" }}</td>
         <td class="hint">{{ r.languages | join(", ") or "—" }}</td>
@@ -31,6 +51,7 @@
         <td>{{ r.hr_salary or "—" }}</td>
         <td><span class="pill">{{ r.status }}</span></td>
         <td>{{ r.n_matches }}</td>
+        <td class="hint">{{ r.last_seen_at.strftime("%d/%m") if r.last_seen_at else "—" }}</td>
       </tr>
       {% endfor %}
     </tbody>

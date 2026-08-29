@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from db.database import get_connection
 
 from datetime import datetime, timezone
+from jobs.fetch_jobs import collect_all
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -128,8 +129,10 @@ def run_matching(candidate_id: int, top: int = Form(3)):
 
 
 @router.post("/matches/{match_id}/status")
-def update_match_status(match_id: int, status: str = Form(...),
-                        candidate_id: int = Form(...)):
+def update_match_status(match_id: int,
+                        status: str = Form(...),
+                        candidate_id: int = Form(default=0),
+                        redirect_to: str = Form(default="")):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -137,27 +140,36 @@ def update_match_status(match_id: int, status: str = Form(...),
                 (status, match_id),
             )
         conn.commit()
-    return RedirectResponse(f"/admin/candidates/{candidate_id}", status_code=303)
+
+    target = redirect_to or f"/admin/candidates/{candidate_id}"
+    # Only allow internal paths — never redirect to a URL supplied from outside.
+    if not target.startswith("/"):
+        target = "/admin/pipeline"
+    return RedirectResponse(target, status_code=303)
 
 
 
 
 @router.get("/jobs", response_class=HTMLResponse)
-def jobs(request: Request, filter: str = "todo"):
+def jobs(request: Request, filter: str = "todo", checked: int = -1, added: int = 0):
     where = {
-        "todo":     "WHERE j.status = 'active' AND j.hr_verified = false",
-        "verified": "WHERE j.hr_verified = true",
-        "active":   "WHERE j.status = 'active'",
-        "all":      "",
+        "todo":      "WHERE j.status = 'active' AND j.hr_verified = false",
+        "recent":    "WHERE j.created_at > now() - interval '24 hours'",
+        "unmatched": "WHERE j.status = 'active' AND NOT EXISTS "
+                     "(SELECT 1 FROM matches m WHERE m.job_uid = j.job_uid)",
+        "verified":  "WHERE j.hr_verified = true",
+        "active":    "WHERE j.status = 'active'",
+        "all":       "",
     }.get(filter, "")
 
     rows = fetch(f"""
         SELECT j.job_uid, j.title, j.employer, j.city, j.is_remote, j.status,
-               j.hr_verified, j.hr_salary, j.details, j.created_at,
+               j.hr_verified, j.hr_salary, j.details, j.created_at, j.last_seen_at,
+               (j.created_at > now() - interval '24 hours') AS is_new,
                (SELECT COUNT(*) FROM matches m WHERE m.job_uid = j.job_uid) AS n_matches
         FROM jobs j
         {where}
-        ORDER BY j.created_at DESC;
+        ORDER BY is_new DESC, j.created_at DESC;
     """)
     for r in rows:
         details = r["details"]
@@ -167,16 +179,19 @@ def jobs(request: Request, filter: str = "todo"):
 
     counts = fetch_one("""
         SELECT
-          COUNT(*) FILTER (WHERE status='active' AND hr_verified=false) AS todo,
-          COUNT(*) FILTER (WHERE hr_verified=true)                      AS verified,
-          COUNT(*) FILTER (WHERE status='active')                       AS active,
-          COUNT(*)                                                      AS all
+          COUNT(*) FILTER (WHERE status='active' AND hr_verified=false)     AS todo,
+          COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours')  AS recent,
+          COUNT(*) FILTER (WHERE status='active' AND NOT EXISTS
+                 (SELECT 1 FROM matches m WHERE m.job_uid = jobs.job_uid))  AS unmatched,
+          COUNT(*) FILTER (WHERE hr_verified=true)                          AS verified,
+          COUNT(*) FILTER (WHERE status='active')                           AS active,
+          COUNT(*)                                                          AS all
         FROM jobs;
     """)
     return templates.TemplateResponse(request, "admin/jobs.html", {
         "rows": rows, "filter": filter, "counts": counts,
+        "checked": checked, "added": added,
     })
-
 
 @router.get("/jobs/{job_uid}", response_class=HTMLResponse)
 def job_detail(request: Request, job_uid: str):
@@ -233,3 +248,45 @@ def run_job_matching(job_uid: str, top: int = Form(3)):
     from match.rerank import rerank_for_job
     rerank_for_job(job_uid, top_n=top)
     return RedirectResponse(f"/admin/jobs/{job_uid}", status_code=303)
+STAGES = [
+    ("suggested", "Suggéré"),
+    ("presented", "Présenté"),
+    ("approved", "Accepté"),
+    ("applied", "Candidature"),
+    ("hired", "Recruté"),
+]
+
+
+@router.get("/pipeline", response_class=HTMLResponse)
+def pipeline(request: Request, eligible: str = "1"):
+    where = "WHERE m.eligible = true" if eligible == "1" else ""
+    rows = fetch(f"""
+        SELECT m.id, m.candidate_id, m.job_uid, m.status, m.llm_score,
+               m.verdict, m.eligible, m.updated_at,
+               c.name AS candidate, j.title AS job, j.employer, j.city
+        FROM matches m
+        JOIN candidates c ON c.id = m.candidate_id
+        JOIN jobs j       ON j.job_uid = m.job_uid
+        {where}
+        ORDER BY m.llm_score DESC NULLS LAST;
+    """)
+    board = {key: [r for r in rows if r["status"] == key] for key, _ in STAGES}
+    closed = [r for r in rows if r["status"] in ("declined", "rejected")]
+    return templates.TemplateResponse(request, "admin/pipeline.html", {
+        "stages": STAGES, "board": board, "closed": closed,
+        "eligible": eligible, "total": len(rows),
+    })
+
+
+@router.post("/jobs/collect")
+def collect_jobs():
+    """Run the JSearch collector, then embed any newly stored jobs."""
+    from jobs.fetch_jobs import fetch_dutch_jobs
+    from match.build_embeddings import embed_table, job_to_text
+
+    total, inserted = fetch_dutch_jobs()
+    embed_table("jobs", "job_uid", job_to_text)   # new jobs need vectors to be matchable
+    return RedirectResponse(
+        f"/admin/jobs?filter=all&checked={total}&added={inserted}", status_code=303
+    )
+total, inserted = collect_all()

@@ -1,0 +1,62 @@
+{% extends "admin/_base_admin.html" %}
+{% block title %}Pipeline — Espace recruteur{% endblock %}
+
+{% block admin_content %}
+<h1>Pipeline <span class="count">{{ total }}</span></h1>
+
+<div class="filters">
+  <a href="/admin/pipeline?eligible=1" class="chip {{ 'on' if eligible=='1' }}">Éligibles uniquement</a>
+  <a href="/admin/pipeline?eligible=0" class="chip {{ 'on' if eligible=='0' }}">Tous les matchs</a>
+</div>
+
+<div class="board-scroll">
+  <div class="board">
+    {% for key, label in stages %}
+    <div class="col">
+      <div class="col-head">{{ label }} <span class="count">{{ board[key] | length }}</span></div>
+
+      {% for m in board[key] %}
+      <div class="kcard {{ 'blocked' if not m.eligible }}">
+        <a href="/admin/candidates/{{ m.candidate_id }}"><strong>{{ m.candidate }}</strong></a>
+        <div class="hint">{{ m.job }}</div>
+        <div class="hint">{{ m.employer or "—" }} · {{ m.city or "—" }}</div>
+        <div class="kfoot">
+          <span class="score {{ 'good' if m.llm_score and m.llm_score >= 70 }}">{{ m.llm_score }}</span>
+          {% if not m.eligible %}<span class="pill warn">bloqué</span>{% endif %}
+        </div>
+        <form action="/admin/matches/{{ m.id }}/status" method="post" class="inline">
+          <input type="hidden" name="redirect_to" value="/admin/pipeline?eligible={{ eligible }}">
+          <select name="status" onchange="this.form.submit()">
+            {% for s in ["suggested","presented","approved","declined","applied","hired","rejected"] %}
+            <option value="{{ s }}" {{ "selected" if s == m.status }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      {% endfor %}
+
+      {% if not board[key] %}<p class="empty">—</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if closed %}
+<div class="card">
+  <h2>Clôturés</h2>
+  <table>
+    <thead><tr><th>Candidat</th><th>Poste</th><th>Score</th><th>Issue</th></tr></thead>
+    <tbody>
+      {% for m in closed %}
+      <tr>
+        <td><a href="/admin/candidates/{{ m.candidate_id }}">{{ m.candidate }}</a></td>
+        <td>{{ m.job }}</td>
+        <td>{{ m.llm_score }}</td>
+        <td><span class="pill">{{ m.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
