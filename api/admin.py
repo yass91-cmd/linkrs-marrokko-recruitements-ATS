@@ -72,14 +72,28 @@ def dashboard(request: Request):
 
 
 @router.get("/candidates", response_class=HTMLResponse)
-def candidates(request: Request):
-    rows = fetch("""
-        SELECT c.id, c.name, c.title, c.location, c.source_method, c.created_at,
-               (SELECT COUNT(*) FROM matches m WHERE m.candidate_id = c.id) AS n_matches,
-               (c.embedding IS NOT NULL) AS embedded
-        FROM candidates c ORDER BY c.created_at DESC;
-    """)
-    return templates.TemplateResponse(request, "admin/candidates.html", {"rows": rows})
+def candidates(request: Request, q: str = ""):
+    query = q.strip()
+    if query:
+        from match.search import search_candidates, _speaks_dutch
+        rows = search_candidates(query, limit=20)
+        for r in rows:
+            r["dutch"] = _speaks_dutch(r["languages"])
+    else:
+        rows = fetch("""
+            SELECT c.id, c.name, c.title, c.location, c.languages, c.source_method,
+                   c.created_at,
+                   (SELECT COUNT(*) FROM matches m WHERE m.candidate_id = c.id) AS n_matches,
+                   (c.embedding IS NOT NULL) AS embedded
+            FROM candidates c ORDER BY c.created_at DESC;
+        """)
+        from match.search import _speaks_dutch
+        for r in rows:
+            r["dutch"] = _speaks_dutch(r["languages"])
+
+    return templates.TemplateResponse(request, "admin/candidates.html", {
+        "rows": rows, "q": query,
+    })
 
 
 @router.get("/candidates/{candidate_id}", response_class=HTMLResponse)

@@ -1,25 +1,39 @@
-
-
 {% extends "admin/_base_admin.html" %}
-
 {% block title %}Candidats — Espace recruteur{% endblock %}
 
 {% block admin_content %}
-
-
 <h1>Candidats <span class="count">{{ rows | length }}</span></h1>
+
+<form class="searchbar" action="/admin/candidates" method="get">
+  <input name="q" value="{{ q }}" placeholder="Recherche sémantique : « néerlandophone avec expérience centre d'appel à Casablanca »">
+  <button class="btn" type="submit">Rechercher</button>
+  {% if q %}<a class="btn-sm" href="/admin/candidates">Effacer</a>{% endif %}
+</form>
+
+{% if q %}
+<p class="hint">Résultats classés par proximité sémantique — la recherche compare le
+   <em>sens</em> de votre requête aux profils, pas les mots exacts.</p>
+{% endif %}
+
 <div class="card">
   <table>
-    <thead><tr><th>Nom</th><th>Titre</th><th>Ville</th><th>Source</th><th>Matchs</th><th>Vecteur</th></tr></thead>
+    <thead><tr>
+      {% if q %}<th>Score</th>{% endif %}
+      <th>Nom</th><th>Titre</th><th>Ville</th><th>🇳🇱</th>
+      <th>Source</th><th>Matchs</th>
+    </tr></thead>
     <tbody>
       {% for r in rows %}
       <tr>
+        {% if q %}
+        <td><span class="score {{ 'good' if r.similarity and r.similarity >= 0.45 }}">{{ "%.2f"|format(r.similarity or 0) }}</span></td>
+        {% endif %}
         <td><a href="/admin/candidates/{{ r.id }}"><strong>{{ r.name or "—" }}</strong></a></td>
         <td>{{ r.title or "—" }}</td>
         <td>{{ r.location or "—" }}</td>
+        <td>{{ "✅" if r.dutch else "—" }}</td>
         <td><span class="pill {{ 'warn' if r.source_method == 'ocr' else '' }}">{{ r.source_method }}</span></td>
         <td>{{ r.n_matches }}</td>
-        <td>{{ "✅" if r.embedded else "—" }}</td>
       </tr>
       {% endfor %}
     </tbody>

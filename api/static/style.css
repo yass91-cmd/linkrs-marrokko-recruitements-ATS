@@ -168,3 +168,9 @@ td a:hover { text-decoration: underline; }
 ul.plain { list-style: none; padding: 0; margin: 0; }
 ul.plain li { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
 ul.plain li:last-child { border-bottom: 0; }
+
+.searchbar { display: flex; gap: 10px; margin: 20px 0 6px; flex-wrap: wrap; align-items: center; }
+.searchbar input { flex: 1; min-width: 260px; margin-top: 0; padding: 11px 14px;
+                   border: 1px solid var(--line); border-radius: 9px;
+                   font-family: inherit; font-size: .95rem; background: var(--surface); color: var(--ink); }
+.searchbar .btn-sm { text-decoration: none; color: var(--ink-soft); }
