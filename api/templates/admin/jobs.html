@@ -4,7 +4,7 @@
 {% block admin_content %}
 <div class="card-head">
   <h1>Offres <span class="count">{{ rows | length }}</span></h1>
-    <form action="/admin/jobs/collect" method="post"
+  <form action="/admin/jobs/collect" method="post"
         onsubmit="this.querySelector('button').disabled = true;
                   this.querySelector('button').textContent = '⏳ Collecte en cours…';">
     <button class="btn" type="submit">⬇️ Collecter les offres</button>
@@ -15,7 +15,7 @@
 <div class="banner">
   ✅ Collecte terminée — {{ checked }} offres vérifiées auprès de l'API,
   <strong>{{ added }}</strong> nouvelle{{ "s" if added != 1 }} enregistrée{{ "s" if added != 1 }}.
-  {% if added == 0 %}Aucune nouveauté : toutes les offres publiées sont déjà dans votre base.{% endif %}
+  {% if added == 0 %} Aucune nouveauté : toutes les offres publiées sont déjà dans votre base.{% endif %}
 </div>
 {% endif %}
 
@@ -34,7 +34,7 @@
   <table>
     <thead><tr>
       <th>Poste</th><th>Entreprise</th><th>Ville</th><th>Langues</th>
-      <th>RH</th><th>Salaire</th><th>Statut</th><th>Matchs</th><th>Vue le</th>
+      <th>RH</th><th>Salaire</th><th>Statut</th><th>Matchs</th><th>Vue le</th><th></th>
     </tr></thead>
     <tbody>
       {% for r in rows %}
@@ -52,6 +52,12 @@
         <td><span class="pill">{{ r.status }}</span></td>
         <td>{{ r.n_matches }}</td>
         <td class="hint">{{ r.last_seen_at.strftime("%d/%m") if r.last_seen_at else "—" }}</td>
+        <td>
+          <form action="/admin/jobs/{{ r.job_uid }}/delete" method="post"
+                onsubmit="return confirm('Supprimer cette offre et ses matchs ?');">
+            <button class="btn-icon" type="submit" title="Supprimer">🗑</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

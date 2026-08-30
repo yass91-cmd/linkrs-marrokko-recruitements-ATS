@@ -1,20 +1,38 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from db.database import get_connection
 
-from datetime import datetime, timezone
-from jobs.fetch_jobs import collect_all
+
+from api.auth import require_admin
+
+
+
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
-router = APIRouter(prefix="/admin", tags=["admin"])
 
+router = APIRouter(prefix="/admin", tags=["admin"],
+                   dependencies=[Depends(require_admin)])
+
+
+STAGES = [
+    ("suggested", "Suggéré"),
+    ("presented", "Présenté"),
+    ("approved", "Accepté"),
+    ("applied", "Candidature"),
+    ("hired", "Recruté"),
+]
+
+
+# --------------------------------------------------------------------------
+# helpers
+# --------------------------------------------------------------------------
 
 def fetch(sql: str, params: tuple = ()) -> list[dict]:
     with get_connection() as conn:
@@ -39,6 +57,10 @@ def as_list(value):
             return []
     return value or []
 
+
+# --------------------------------------------------------------------------
+# dashboard
+# --------------------------------------------------------------------------
 
 @router.get("", response_class=HTMLResponse)
 def dashboard(request: Request):
@@ -72,14 +94,18 @@ def dashboard(request: Request):
     })
 
 
+# --------------------------------------------------------------------------
+# candidates
+# --------------------------------------------------------------------------
+
 @router.get("/candidates", response_class=HTMLResponse)
 def candidates(request: Request, q: str = ""):
+    from match.search import _speaks_dutch
+
     query = q.strip()
     if query:
-        from match.search import search_candidates, _speaks_dutch
+        from match.search import search_candidates
         rows = search_candidates(query, limit=20)
-        for r in rows:
-            r["dutch"] = _speaks_dutch(r["languages"])
     else:
         rows = fetch("""
             SELECT c.id, c.name, c.title, c.location, c.languages, c.source_method,
@@ -88,9 +114,9 @@ def candidates(request: Request, q: str = ""):
                    (c.embedding IS NOT NULL) AS embedded
             FROM candidates c ORDER BY c.created_at DESC;
         """)
-        from match.search import _speaks_dutch
-        for r in rows:
-            r["dutch"] = _speaks_dutch(r["languages"])
+
+    for r in rows:
+        r["dutch"] = _speaks_dutch(r["languages"])
 
     return templates.TemplateResponse(request, "admin/candidates.html", {
         "rows": rows, "q": query,
@@ -128,6 +154,10 @@ def run_matching(candidate_id: int, top: int = Form(3)):
     return RedirectResponse(f"/admin/candidates/{candidate_id}", status_code=303)
 
 
+# --------------------------------------------------------------------------
+# matches
+# --------------------------------------------------------------------------
+
 @router.post("/matches/{match_id}/status")
 def update_match_status(match_id: int,
                         status: str = Form(...),
@@ -148,7 +178,9 @@ def update_match_status(match_id: int,
     return RedirectResponse(target, status_code=303)
 
 
-
+# --------------------------------------------------------------------------
+# jobs
+# --------------------------------------------------------------------------
 
 @router.get("/jobs", response_class=HTMLResponse)
 def jobs(request: Request, filter: str = "todo", checked: int = -1, added: int = 0):
@@ -192,6 +224,7 @@ def jobs(request: Request, filter: str = "todo", checked: int = -1, added: int =
         "rows": rows, "filter": filter, "counts": counts,
         "checked": checked, "added": added,
     })
+
 
 @router.get("/jobs/{job_uid}", response_class=HTMLResponse)
 def job_detail(request: Request, job_uid: str):
@@ -242,20 +275,41 @@ def save_hr(job_uid: str,
         conn.commit()
     return RedirectResponse(f"/admin/jobs/{job_uid}", status_code=303)
 
+
 @router.post("/jobs/{job_uid}/match")
 def run_job_matching(job_uid: str, top: int = Form(3)):
     """Reverse matching: find the best candidates for this job."""
     from match.rerank import rerank_for_job
     rerank_for_job(job_uid, top_n=top)
     return RedirectResponse(f"/admin/jobs/{job_uid}", status_code=303)
-STAGES = [
-    ("suggested", "Suggéré"),
-    ("presented", "Présenté"),
-    ("approved", "Accepté"),
-    ("applied", "Candidature"),
-    ("hired", "Recruté"),
-]
 
+
+@router.post("/jobs/{job_uid}/delete")
+def delete_job(job_uid: str):
+    """Permanently remove a job. Its matches go too (ON DELETE CASCADE)."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM jobs WHERE job_uid = %s;", (job_uid,))
+        conn.commit()
+    return RedirectResponse("/admin/jobs?filter=all", status_code=303)
+
+
+@router.post("/jobs/collect")
+def collect_jobs():
+    """Run the JSearch collector across all query terms, then embed new jobs."""
+    from jobs.fetch_jobs import collect_all
+    from match.build_embeddings import embed_table, job_to_text
+
+    total, inserted = collect_all()
+    embed_table("jobs", "job_uid", job_to_text)   # new jobs need vectors to be matchable
+    return RedirectResponse(
+        f"/admin/jobs?filter=all&checked={total}&added={inserted}", status_code=303
+    )
+
+
+# --------------------------------------------------------------------------
+# pipeline
+# --------------------------------------------------------------------------
 
 @router.get("/pipeline", response_class=HTMLResponse)
 def pipeline(request: Request, eligible: str = "1"):
@@ -276,17 +330,3 @@ def pipeline(request: Request, eligible: str = "1"):
         "stages": STAGES, "board": board, "closed": closed,
         "eligible": eligible, "total": len(rows),
     })
-
-
-@router.post("/jobs/collect")
-def collect_jobs():
-    """Run the JSearch collector, then embed any newly stored jobs."""
-    from jobs.fetch_jobs import fetch_dutch_jobs
-    from match.build_embeddings import embed_table, job_to_text
-
-    total, inserted = fetch_dutch_jobs()
-    embed_table("jobs", "job_uid", job_to_text)   # new jobs need vectors to be matchable
-    return RedirectResponse(
-        f"/admin/jobs?filter=all&checked={total}&added={inserted}", status_code=303
-    )
-total, inserted = collect_all()

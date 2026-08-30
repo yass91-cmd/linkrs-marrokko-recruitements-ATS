@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Connexion — Espace recruteur{% endblock %}
+
+{% block content %}
+<div class="login-wrap">
+  <div class="card">
+    <h1>Espace recruteur</h1>
+    <p class="hint">Cet espace contient des données personnelles de candidats.</p>
+
+    {% if error %}
+    <div class="warnings"><strong>Identifiants incorrects.</strong></div>
+    {% endif %}
+
+    <form action="/login" method="post">
+      <label>Email
+        <input type="email" name="email" required autofocus autocomplete="username">
+      </label>
+      <label>Mot de passe
+        <input type="password" name="password" required autocomplete="current-password">
+      </label>
+      <button class="btn" type="submit">Se connecter</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

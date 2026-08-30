@@ -6,8 +6,10 @@ from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from psycopg.types.json import Json
 from pgvector.psycopg import register_vector
+from dotenv import load_dotenv
 
 from ingest.extractor import extract_text, ExtractionError
 from extract.cv_parser import parse_cv
@@ -16,17 +18,35 @@ from db.database import get_connection
 from match.embeddings import embed
 from match.build_embeddings import candidate_to_text
 from api.admin import router as admin_router
+from api.auth import router as auth_router
 
-
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_MB = 10
 ALLOWED = {".pdf", ".docx", ".jpg", ".jpeg", ".png"}
 
+# A missing secret must stop the application, never silently fall back to an
+# insecure default — a known signing key means forgeable admin sessions.
+SESSION_SECRET = os.getenv("SESSION_SECRET")
+if not SESSION_SECRET:
+    raise RuntimeError("SESSION_SECRET is not set — refusing to start insecurely")
+
 app = FastAPI(title="CV Matcher — Linkrs Morocco")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET,
+    max_age=8 * 3600,      # sessions expire after 8 hours
+    same_site="lax",       # cookie not sent on cross-site POSTs (partial CSRF defence)
+    https_only=False,      # set True once deployed behind HTTPS
+)
+
+app.include_router(auth_router)
 app.include_router(admin_router)
+
 
 # --------------------------------------------------------------------------
 # helpers
@@ -59,7 +79,7 @@ def _zip_rows(form, keys: list[str], names: list[str]) -> list[dict]:
 
 
 # --------------------------------------------------------------------------
-# routes
+# public routes
 # --------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
@@ -108,6 +128,9 @@ async def upload(request: Request, file: UploadFile = File(...)):
     finally:
         os.unlink(tmp.name)
 
+    # Remember which profile this visitor may edit (authorization, not authentication).
+    request.session["own_candidate_id"] = candidate_id
+
     return templates.TemplateResponse(
         request, "result.html",
         {"candidate": candidate, "candidate_id": candidate_id, "method": method},
@@ -116,6 +139,14 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
 @app.post("/candidate/{candidate_id}/update", response_class=HTMLResponse)
 async def update_candidate(request: Request, candidate_id: int):
+    # Authorization: only the visitor who uploaded this CV may edit it.
+    # Without this check, anyone could overwrite any profile by guessing an id (IDOR).
+    if request.session.get("own_candidate_id") != candidate_id:
+        return templates.TemplateResponse(
+            request, "error.html",
+            {"message": "Vous n'êtes pas autorisé à modifier ce profil."},
+        )
+
     form = await request.form()
 
     education = _zip_rows(form, ["edu_degree", "edu_institution", "edu_year"],

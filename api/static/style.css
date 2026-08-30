@@ -193,4 +193,15 @@ ul.plain li:last-child { border-bottom: 0; }
 .row-new { background: #fff8f2; }
 .badge-new { display: inline-block; background: var(--accent); color: #fff;
              font-size: .66rem; font-weight: 700; letter-spacing: .05em;
-             padding: 2px 6px; border-radius: 5px; margin-right: 6px; vertical-align: middle; }          
+             padding: 2px 6px; border-radius: 5px; margin-right: 6px; vertical-align: middle; }     
+.btn-danger { background: transparent; color: #b7791f; border: 1px solid #e3c9a0;
+              border-radius: 8px; padding: 8px 14px; font-size: .88rem;
+              cursor: pointer; font-family: inherit; }
+.btn-danger:hover { background: #fdf6e6; }     
+.btn-icon { background: transparent; border: 0; cursor: pointer; font-size: .95rem;
+            opacity: .35; padding: 4px 6px; border-radius: 6px; }
+.btn-icon:hover { opacity: 1; background: #fdf6e6; }
+tr:hover .btn-icon { opacity: .7; }
+.login-wrap { max-width: 420px; margin: 40px auto; }
+.logout { margin-left: auto; color: var(--ink-faint); }
+.subnav { align-items: center; }

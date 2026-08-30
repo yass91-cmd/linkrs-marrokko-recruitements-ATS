@@ -84,6 +84,11 @@
 
         <button class="btn" type="submit">Enregistrer</button>
       </form>
+      <form action="/admin/jobs/{{ j.job_uid }}/delete" method="post"
+            onsubmit="return confirm('Supprimer définitivement cette offre et ses matchs ?');"
+            style="margin-top:14px">
+        <button class="btn-danger" type="submit">🗑 Supprimer l'offre</button>
+      </form>
     </div>
   </div>
 </div>
