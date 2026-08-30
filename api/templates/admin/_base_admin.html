@@ -1,24 +1,16 @@
 {% extends "base.html" %}
 
+{% block nav %}
+  <span class="nav-user">👤 {{ request.session.get('email') }}</span>
+  <a href="/logout">Déconnexion</a>
+{% endblock %}
+
 {% block content %}
 <nav class="subnav">
   <a href="/admin">Dashboard</a>
   <a href="/admin/candidates">Candidats</a>
   <a href="/admin/jobs">Offres</a>
+  <a href="/admin/pipeline">Pipeline</a>
 </nav>
 {% block admin_content %}{% endblock %}
 {% endblock %}
-<nav class="subnav">
-  <a href="/admin">Dashboard</a>
-  <a href="/admin/candidates">Candidats</a>
-  <a href="/admin/jobs">Offres</a>
-  <a href="/admin/pipeline">Pipeline</a>
-</nav>
-
-<nav class="subnav">
-  <a href="/admin">Dashboard</a>
-  <a href="/admin/candidates">Candidats</a>
-  <a href="/admin/jobs">Offres</a>
-  <a href="/admin/pipeline">Pipeline</a>
-  <a href="/logout" class="logout">Déconnexion</a>
-</nav>

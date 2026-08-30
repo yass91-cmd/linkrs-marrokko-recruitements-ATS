@@ -16,11 +16,13 @@
 {% endif %}
 
 <div class="card">
+  {% if not rows %}<p class="hint">Aucun candidat.</p>{% endif %}
+  {% if rows %}
   <table>
     <thead><tr>
       {% if q %}<th>Score</th>{% endif %}
       <th>Nom</th><th>Titre</th><th>Ville</th><th>🇳🇱</th>
-      <th>Source</th><th>Matchs</th>
+      <th>Source</th><th>Matchs</th><th></th>
     </tr></thead>
     <tbody>
       {% for r in rows %}
@@ -34,9 +36,16 @@
         <td>{{ "✅" if r.dutch else "—" }}</td>
         <td><span class="pill {{ 'warn' if r.source_method == 'ocr' else '' }}">{{ r.source_method }}</span></td>
         <td>{{ r.n_matches }}</td>
+        <td>
+          <form action="/admin/candidates/{{ r.id }}/delete" method="post"
+                onsubmit="return confirm('Supprimer définitivement ce candidat et toutes ses données ?');">
+            <button class="btn-icon" type="submit" title="Supprimer">🗑</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% endif %}
 </div>
 {% endblock %}

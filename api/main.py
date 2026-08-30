@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -19,6 +19,7 @@ from match.embeddings import embed
 from match.build_embeddings import candidate_to_text
 from api.admin import router as admin_router
 from api.auth import router as auth_router
+from api.candidate_auth import router as candidate_auth_router
 
 load_dotenv()
 
@@ -27,7 +28,7 @@ MAX_UPLOAD_MB = 10
 ALLOWED = {".pdf", ".docx", ".jpg", ".jpeg", ".png"}
 
 # A missing secret must stop the application, never silently fall back to an
-# insecure default — a known signing key means forgeable admin sessions.
+# insecure default — a known signing key means forgeable sessions.
 SESSION_SECRET = os.getenv("SESSION_SECRET")
 if not SESSION_SECRET:
     raise RuntimeError("SESSION_SECRET is not set — refusing to start insecurely")
@@ -45,6 +46,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(candidate_auth_router)
 app.include_router(admin_router)
 
 
@@ -87,8 +89,20 @@ def home(request: Request):
     return templates.TemplateResponse(request, "index.html")
 
 
+@app.get("/upload", response_class=HTMLResponse)
+def upload_form(request: Request):
+    # Sign-in first: it gives us a verified email, which is the identity key.
+    if not request.session.get("candidate_email"):
+        return RedirectResponse("/auth/google?next=/upload", status_code=303)
+    return templates.TemplateResponse(request, "upload.html")
+
+
 @app.post("/upload", response_class=HTMLResponse)
 async def upload(request: Request, file: UploadFile = File(...)):
+    verified_email = request.session.get("candidate_email")
+    if not verified_email:
+        return RedirectResponse("/auth/google?next=/upload", status_code=303)
+
     suffix = Path(file.filename or "").suffix.lower()
 
     if suffix not in ALLOWED:
@@ -114,6 +128,12 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
         text, method = extract_text(tmp.name, with_method=True)
         candidate = parse_cv(text, source_is_ocr=(method == "ocr"))
+
+        # The Google-verified email is authoritative — it replaces whatever was
+        # read from the document, which OCR can corrupt (the l/1 problem).
+        candidate.email = verified_email
+        candidate.warnings = [w for w in candidate.warnings if "mail" not in w.lower()]
+
         candidate_id = save_candidate(candidate, source_method=method, raw_text=text)
         _embed_candidate(candidate_id, candidate.model_dump())
 
@@ -139,7 +159,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
 @app.post("/candidate/{candidate_id}/update", response_class=HTMLResponse)
 async def update_candidate(request: Request, candidate_id: int):
-    # Authorization: only the visitor who uploaded this CV may edit it.
+    # Authorization: only the visitor who owns this profile may edit it.
     # Without this check, anyone could overwrite any profile by guessing an id (IDOR).
     if request.session.get("own_candidate_id") != candidate_id:
         return templates.TemplateResponse(

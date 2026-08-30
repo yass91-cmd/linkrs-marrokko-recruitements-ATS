@@ -1,41 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Déposer mon CV — CV Matcher{% endblock %}
+{% block title %}CV Matcher — Postes néerlandophones au Maroc{% endblock %}
 
 {% block content %}
-<h1>Trouvez un poste néerlandophone au Maroc</h1>
-<p class="lede">
-  Déposez votre CV et notre système identifie automatiquement les offres qui
-  correspondent à votre profil et à votre niveau de néerlandais.
-</p>
-
-<div class="card">
-  <h2>Déposer votre CV</h2>
-  <form action="/upload" method="post" enctype="multipart/form-data">
-    <div class="dropzone">
-      <input type="file" name="file" accept=".pdf,.docx,.jpg,.jpeg,.png" required>
-      <p class="hint">PDF, DOCX ou photo — 10 Mo maximum</p>
-    </div>
-    <p style="margin-top:18px">
-      <button class="btn" type="submit">Analyser mon CV</button>
-    </p>
-  </form>
-</div>
+<section class="hero">
+  <h1>Votre CV, les bons postes néerlandophones</h1>
+  <p class="lede">
+    Nous collectons chaque jour les offres qui exigent le néerlandais au Maroc —
+    centres d'appels, relation client, vente — et nous les comparons automatiquement
+    à votre profil.
+  </p>
+    <div class="cta-row">
+    <a class="btn" href="/upload">Déposer mon CV</a>
+  </div>
+  <p class="hint">Une connexion Google est requise pour retrouver votre profil
+     et suivre vos candidatures.</p>
+  <p class="hint">Connectez-vous pour suivre vos candidatures et retrouver votre profil.</p>
+</section>
 
 <div class="steps">
   <div class="step">
     <span class="n">01</span>
     <h3>Analyse</h3>
-    <p>Votre CV est lu et structuré automatiquement, même s'il est scanné.</p>
+    <p>Votre CV est lu et structuré automatiquement, même s'il est scanné ou photographié.</p>
   </div>
   <div class="step">
     <span class="n">02</span>
     <h3>Mise en correspondance</h3>
-    <p>Votre profil est comparé aux offres néerlandophones disponibles.</p>
+    <p>Votre profil est comparé au sens des offres, pas seulement aux mots-clés.</p>
   </div>
   <div class="step">
     <span class="n">03</span>
     <h3>Contact</h3>
-    <p>Un recruteur vous contacte pour les postes qui vous correspondent.</p>
+    <p>Un recruteur vous contacte pour les postes qui vous correspondent réellement.</p>
   </div>
 </div>
 {% endblock %}

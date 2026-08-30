@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Déposer mon CV — CV Matcher{% endblock %}
+
+{% block content %}
+<h1>Déposer votre CV</h1>
+<p class="lede">PDF, Word ou photo de votre CV — nous nous occupons du reste.</p>
+
+<div class="card">
+  <form action="/upload" method="post" enctype="multipart/form-data"
+        onsubmit="this.querySelector('button').disabled = true;
+                  this.querySelector('button').textContent = '⏳ Analyse en cours…';">
+    <div class="dropzone">
+      <input type="file" name="file" accept=".pdf,.docx,.jpg,.jpeg,.png" required>
+      <p class="hint">PDF, DOCX ou photo — 10 Mo maximum</p>
+    </div>
+    <p style="margin-top:18px">
+      <button class="btn" type="submit">Analyser mon CV</button>
+    </p>
+  </form>
+</div>
+<p class="hint">Connecté en tant que <strong>{{ request.session.get('candidate_email') }}</strong></p>
+{% endblock %}

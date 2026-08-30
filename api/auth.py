@@ -41,6 +41,9 @@ def login(request: Request, email: str = Form(...), password: str = Form(...)):
     password_ok = secrets.compare_digest(password, ADMIN_PASSWORD)
 
     if email_ok and password_ok:
+        # One identity per session: signing in as recruiter ends any candidate session.
+        request.session.pop("candidate_email", None)
+        request.session.pop("own_candidate_id", None)
         request.session["admin"] = True
         request.session["email"] = ADMIN_EMAIL
         return RedirectResponse("/admin", status_code=303)

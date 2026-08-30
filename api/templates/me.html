@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Mon espace — CV Matcher{% endblock %}
+
+{% block content %}
+<h1>Mon espace</h1>
+<p class="lede">Connecté en tant que <strong>{{ email }}</strong> ·
+   <a href="/auth/logout">Se déconnecter</a></p>
+
+{% if not candidate %}
+<div class="card">
+  <h2>Aucun CV enregistré</h2>
+  <p>Nous n'avons pas encore de profil associé à cette adresse.</p>
+  <p style="margin-top:16px"><a class="btn" href="/">Déposer mon CV</a></p>
+</div>
+{% else %}
+
+<div class="card">
+  <h2>{{ candidate.name or "Mon profil" }}</h2>
+  {% if candidate.title %}<p class="hint">{{ candidate.title }}</p>{% endif %}
+  <dl class="profile">
+    <dt>Email</dt><dd>{{ candidate.email or "—" }}</dd>
+    <dt>Téléphone</dt><dd>{{ candidate.phone or "—" }}</dd>
+    <dt>Localisation</dt><dd>{{ candidate.location or "—" }}</dd>
+  </dl>
+  <p><a class="btn-sm" href="/">Mettre à jour mon CV</a></p>
+</div>
+
+<div class="card">
+  <h2>Offres proposées</h2>
+  {% if not matches %}
+    <p class="hint">Aucune offre ne vous a encore été proposée. Nos recruteurs
+       vous contacteront dès qu'un poste correspond à votre profil.</p>
+  {% endif %}
+  {% for m in matches %}
+  <div class="match">
+    <div class="match-head">
+      <div>
+        <strong>{{ m.title }}</strong>
+        <div class="hint">{{ m.employer or "—" }} · {{ m.city or "—" }}</div>
+      </div>
+      <span class="pill">{{ m.status }}</span>
+    </div>
+    {% if m.summary %}<p class="summary">{{ m.summary }}</p>{% endif %}
+    {% if m.apply_link %}
+      <a class="hint" href="{{ m.apply_link }}" target="_blank" rel="noopener">Voir l'offre ↗</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

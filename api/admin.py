@@ -330,3 +330,17 @@ def pipeline(request: Request, eligible: str = "1"):
         "stages": STAGES, "board": board, "closed": closed,
         "eligible": eligible, "total": len(rows),
     })
+@router.post("/candidates/{candidate_id}/delete")
+def delete_candidate(candidate_id: int):
+    """
+    Permanently erase a candidate and everything derived from them.
+
+    GDPR Art. 17 (right to erasure): this must remove ALL personal data, including
+    raw_text (which holds the full CV) and the embedding (derived from it).
+    Their matches are removed automatically by ON DELETE CASCADE.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM candidates WHERE id = %s;", (candidate_id,))
+        conn.commit()
+    return RedirectResponse("/admin/candidates", status_code=303)

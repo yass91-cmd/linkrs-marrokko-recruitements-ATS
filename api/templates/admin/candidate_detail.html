@@ -21,3 +21,12 @@
   </table>
 </div>
 {% endblock %}
+<div class="card danger-zone">
+  <h2>Zone de suppression</h2>
+  <p class="hint">Supprime définitivement ce candidat, son CV, ses données personnelles
+     et tous ses matchs. Action irréversible (droit à l'effacement, RGPD).</p>
+  <form action="/admin/candidates/{{ c.id }}/delete" method="post"
+        onsubmit="return confirm('Supprimer définitivement {{ c.name }} et toutes ses données ?');">
+    <button class="btn-danger" type="submit">🗑 Supprimer ce candidat</button>
+  </form>
+</div>
