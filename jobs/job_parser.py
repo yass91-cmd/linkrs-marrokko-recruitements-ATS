@@ -3,34 +3,49 @@ import json
 import time
 import logging
 from extract.llm_client import client, MODEL
-from jobs.job_schema import JobDetails
+from jobs.job_schema import JobDetails, PastedJob
 
 logger = logging.getLogger(__name__)
 
-PROMPT = """You are an expert job-offer parser for a recruitment company.
-Extract structured information from the job description below (French / English / Arabic).
+PASTE_PROMPT = """You are an expert job-offer parser for a recruitment company.
+The text below was copied from a job board (French / English / Dutch / Arabic).
+It contains the job title, the employer, the location and the description all mixed together.
 
 Return ONLY a valid JSON object with EXACTLY these keys:
 {
-  "missions": [strings],
-  "requirements": [strings],
-  "languages": [strings],
-  "contract_type": string or null,
-  "salary": string or null,
-  "schedule": string or null,
-  "benefits": [strings],
-  "experience_required": string or null
+  "title": string or null,
+  "employer": string or null,
+  "city": string or null,
+  "is_remote": true or false,
+  "details": {
+    "missions": [strings],
+    "requirements": [strings],
+    "languages": [strings],
+    "contract_type": string or null,
+    "salary": string or null,
+    "schedule": string or null,
+    "benefits": [strings],
+    "experience_required": string or null
+  }
 }
 
 Rules:
-- Use [] for missing lists and null for missing scalars.
-- "languages": languages the job requires (e.g. Néerlandais, Français, Anglais).
-- Keep each mission / requirement / benefit as a short individual string.
-- Never invent information not in the text.
+- Write EVERY extracted value in English, translating from French, Dutch or
+  Arabic where needed. This includes the title, the city, the missions, the
+  requirements and the benefits.
+- Exception: "employer" keeps the company's name exactly as printed.
+- "title" is the job title only, without the company or the city.
+- "city" uses the standard Latin spelling (Casablanca, Rabat, Tangier,
+  Marrakesh, Agadir), never Arabic script.
+- "is_remote" is true only if the text says télétravail / remote / thuiswerk /
+  work from home.
+- "languages" are the languages the job requires, named in English
+  (Dutch, French, English, Arabic).
+- Use [] for missing lists and null for missing scalars. Never invent anything.
 
-JOB DESCRIPTION:
+PASTED TEXT:
 \"\"\"
-{{DESC}}
+{{TEXT}}
 \"\"\"
 """
 
@@ -46,8 +61,8 @@ def _extract_json(raw: str) -> dict:
     return json.loads(m.group(0))
 
 
-def parse_job_details(description: str, retries: int = 4) -> JobDetails:
-    prompt = PROMPT.replace("{{DESC}}", description or "")
+def _ask_json(prompt: str, model_cls, retries: int = 4):
+    """Ask the model for one JSON object and validate it, retrying on bad output."""
     messages = [
         {"role": "system", "content": "You are a strict JSON extraction API. Output ONLY one valid JSON object."},
         {"role": "user", "content": prompt},
@@ -60,29 +75,21 @@ def parse_job_details(description: str, retries: int = 4) -> JobDetails:
         content = resp.choices[0].message.content or ""
         if content.strip():
             try:
-                return JobDetails(**_extract_json(content))
+                return model_cls(**_extract_json(content))
             except Exception as e:
                 last = str(e)[:120]
-                logger.warning("Job-parse retry %d/%d: %s", attempt, retries, last)
+                logger.warning("Parse retry %d/%d: %s", attempt, retries, last)
         time.sleep(2)
-    raise ValueError(f"Failed to parse job after {retries} attempts. Last: {last}")
+    raise ValueError(f"Failed to parse after {retries} attempts. Last: {last}")
+
+
+def parse_pasted_job(text: str, retries: int = 4) -> PastedJob:
+    """Read a whole pasted advert: title, employer, city and the structured body."""
+    return _ask_json(PASTE_PROMPT.replace("{{TEXT}}", text or ""), PastedJob, retries)
 
 
 if __name__ == "__main__":
-    import os
-    import requests
-    from dotenv import load_dotenv
+    import sys
 
-    load_dotenv()
-    resp = requests.get(
-        "https://jsearch.p.rapidapi.com/search-v2",
-        headers={"x-rapidapi-key": os.getenv("RAPIDAPI_KEY"),
-                 "x-rapidapi-host": "jsearch.p.rapidapi.com"},
-        params={"query": "néerlandais", "country": "ma", "num_pages": "1", "date_posted": "all"},
-    )
-    jobs = resp.json().get("data", {}).get("jobs", [])
-    if jobs:
-        job = jobs[0]
-        print("JOB:", job.get("job_title"), "\n")
-        details = parse_job_details(job.get("job_description", ""))
-        print(json.dumps(details.model_dump(), indent=2, ensure_ascii=False))
+    parsed = parse_pasted_job(sys.stdin.read())
+    print(json.dumps(parsed.model_dump(), indent=2, ensure_ascii=False))

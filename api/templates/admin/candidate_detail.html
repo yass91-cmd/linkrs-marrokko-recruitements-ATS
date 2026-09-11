@@ -1,26 +1,133 @@
 {% extends "admin/_base_admin.html" %}
-{% block title %}Candidats — Espace recruteur{% endblock %}
+{% block title %}{{ c.name or "Candidat" }} — Espace recruteur{% endblock %}
 
 {% block admin_content %}
-<h1>Candidats <span class="count">{{ rows | length }}</span></h1>
-<div class="card">
-  <table>
-    <thead><tr><th>Nom</th><th>Titre</th><th>Ville</th><th>Source</th><th>Matchs</th><th>Vecteur</th></tr></thead>
-    <tbody>
-      {% for r in rows %}
-      <tr>
-        <td><a href="/admin/candidates/{{ r.id }}"><strong>{{ r.name or "—" }}</strong></a></td>
-        <td>{{ r.title or "—" }}</td>
-        <td>{{ r.location or "—" }}</td>
-        <td><span class="pill {{ 'warn' if r.source_method == 'ocr' else '' }}">{{ r.source_method }}</span></td>
-        <td>{{ r.n_matches }}</td>
-        <td>{{ "✅" if r.embedded else "—" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<p class="crumb"><a href="/admin/candidates">← Tous les candidats</a></p>
+
+{% if not c %}
+<div class="card"><p>Candidat introuvable.</p></div>
+{% else %}
+
+<h1>{{ c.name or "Candidat sans nom" }}</h1>
+<p class="lede">
+  {{ c.title or "Titre non précisé" }} · {{ c.location or "—" }}
+  · <span class="pill {{ 'warn' if c.source_method in ('ocr', 'telegram/vision') }}">{{ c.source_method }}</span>
+</p>
+
+{% if warnings %}
+<div class="warnings">
+  <strong>À vérifier avant de contacter ce candidat</strong>
+  <ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
 </div>
-{% endblock %}
+{% endif %}
+
+<div class="split">
+  <div>
+    <div class="card">
+      <h2>Profil extrait</h2>
+      <dl class="profile">
+        <dt>Email</dt><dd>{{ c.email or "—" }}</dd>
+        <dt>Téléphone</dt><dd>{{ c.phone or "—" }}</dd>
+        <dt>Localisation</dt><dd>{{ c.location or "—" }}</dd>
+        <dt>Source</dt><dd>{{ c.source_method }}</dd>
+        <dt>Reçu le</dt><dd>{{ c.created_at.strftime("%d/%m/%Y %H:%M") if c.created_at else "—" }}</dd>
+      </dl>
+
+      {% if c.summary %}
+      <h3>Résumé</h3>
+      <p>{{ c.summary }}</p>
+      {% endif %}
+
+      {% if languages %}
+      <h3>Langues</h3>
+      <div class="tags">{% for l in languages %}<span class="tag">{{ l }}</span>{% endfor %}</div>
+      {% endif %}
+
+      {% if skills %}
+      <h3>Compétences</h3>
+      <div class="tags">{% for s in skills %}<span class="tag">{{ s }}</span>{% endfor %}</div>
+      {% endif %}
+
+      {% if experience %}
+      <h3>Expérience</h3>
+      <ul class="plain">
+        {% for e in experience %}
+        <li><strong>{{ e.title or "—" }}</strong>{% if e.company %} · {{ e.company }}{% endif %}
+          {% if e.duration %}<span class="hint"> — {{ e.duration }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if education %}
+      <h3>Formation</h3>
+      <ul class="plain">
+        {% for e in education %}
+        <li><strong>{{ e.degree or "—" }}</strong>{% if e.institution %} · {{ e.institution }}{% endif %}
+          {% if e.year %}<span class="hint"> — {{ e.year }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if c.projects %}
+      <h3>Projets</h3>
+      <ul class="plain">{% for p in c.projects %}<li>{{ p }}</li>{% endfor %}</ul>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>CV original</h2>
+      {% if cv_url %}
+      <p><a class="btn-sm" href="{{ cv_url }}" target="_blank" rel="noopener">📄 Ouvrir le fichier reçu</a></p>
+      <p class="hint">Lien valable 5 minutes — régénérez la page pour un nouveau lien.</p>
+      {% else %}
+      <p class="hint">Aucun fichier original conservé pour ce candidat
+         (envoyé avant l'ajout de ce stockage, ou stockage indisponible).</p>
+      {% endif %}
+    </div>
+
+    {% if c.raw_text %}
+    <div class="card">
+      <h2>Texte extrait <span class="hint">(par {{ c.source_method }}, avant structuration)</span></h2>
+      <pre class="raw-text">{{ c.raw_text }}</pre>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Correspondances</h2>
+      <form action="/admin/candidates/{{ c.id }}/match" method="post" style="margin-bottom:16px">
+        <button class="btn-sm" type="submit">🔍 Lancer le matching</button>
+      </form>
+
+      {% if not matches %}
+      <p class="hint">Aucune correspondance calculée pour l'instant.</p>
+      {% endif %}
+
+      {% for m in matches %}
+      <div class="match">
+        <div class="match-head">
+          <div>
+            <strong>{{ m.title }}</strong>
+            <div class="hint">{{ m.employer or "—" }} · {{ m.city or "—" }}</div>
+          </div>
+          <span class="pill">{{ m.llm_score if m.llm_score is not none else "—" }}/100</span>
+        </div>
+        <p class="hint">{{ m.verdict or "—" }} · statut : {{ m.status }}
+          {% if not m.eligible %}· <span class="pill warn">non éligible</span>{% endif %}</p>
+        {% if m.summary %}<p class="summary">{{ m.summary }}</p>{% endif %}
+        {% if m.strengths %}
+        <p class="hint"><strong>Points forts :</strong> {{ m.strengths | join(", ") }}</p>
+        {% endif %}
+        {% if m.gaps %}
+        <p class="hint"><strong>Écarts :</strong> {{ m.gaps | join(", ") }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
 <div class="card danger-zone">
   <h2>Zone de suppression</h2>
   <p class="hint">Supprime définitivement ce candidat, son CV, ses données personnelles
@@ -30,3 +137,6 @@
     <button class="btn-danger" type="submit">🗑 Supprimer ce candidat</button>
   </form>
 </div>
+
+{% endif %}
+{% endblock %}

@@ -16,3 +16,21 @@ class JobDetails(BaseModel):
     @classmethod
     def none_to_list(cls, v):
         return [] if v is None else v
+
+
+class PastedJob(BaseModel):
+    """A whole advert pasted from a job board: identity plus the structured body.
+
+    The collector never uses this — there, title/employer/city come from the API
+    and are authoritative. Here they have to be read out of the text itself.
+    """
+    title: Optional[str] = None
+    employer: Optional[str] = None
+    city: Optional[str] = None
+    is_remote: bool = False
+    details: JobDetails = Field(default_factory=JobDetails)
+
+    @field_validator("is_remote", mode="before")
+    @classmethod
+    def none_to_false(cls, v):
+        return False if v is None else v

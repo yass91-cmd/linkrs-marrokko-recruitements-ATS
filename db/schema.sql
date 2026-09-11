@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS candidates (
     warnings         jsonb DEFAULT '[]'::jsonb,
     source_method    text,
     raw_text         text,
+    file_path        text,     -- path inside the 'cv-files' Supabase Storage bucket
     embedding        vector(384),
     created_at       timestamptz DEFAULT now()
 );
@@ -34,6 +35,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     city             text,
     is_remote        boolean,
     apply_link       text,
+    publisher        text,                      -- which board advertised it
+    source           text NOT NULL DEFAULT 'jsearch',   -- 'jsearch' | 'manual'
     description      text,
     details          jsonb,
 
@@ -78,9 +81,10 @@ CREATE TABLE IF NOT EXISTS matches (
     blocking_reasons jsonb DEFAULT '[]'::jsonb,
 
     -- workflow (your steps 3-6)
-    status           text NOT NULL DEFAULT 'suggested'
-                     CHECK (status IN ('suggested','presented','approved',
+    status           text NOT NULL DEFAULT 'non_traite'
+                     CHECK (status IN ('non_traite','suggested','presented','approved',
                                        'declined','applied','hired','rejected')),
+                                       
     note             text,
 
     -- audit
@@ -89,3 +93,6 @@ CREATE TABLE IF NOT EXISTS matches (
 
     UNIQUE (candidate_id, job_uid)
 );
+-- Migration: add file_path if this schema is re-applied to an existing database
+-- (schema.sql uses IF NOT EXISTS on CREATE TABLE, which never alters existing tables)
+ALTER TABLE candidates ADD COLUMN IF NOT EXISTS file_path text;

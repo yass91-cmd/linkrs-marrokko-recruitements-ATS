@@ -1,21 +1,36 @@
 {% extends "base.html" %}
-{% block title %}CV Matcher — Postes néerlandophones au Maroc{% endblock %}
+{% block title %}Linkrs Marokko — Postes néerlandophones au Maroc{% endblock %}
 
 {% block content %}
 <section class="hero">
-  <h1>Votre CV, les bons postes néerlandophones</h1>
+  <h1>Votre CV, les meilleures opportunités néerlandophones au Maroc</h1>
   <p class="lede">
-    Nous collectons chaque jour les offres qui exigent le néerlandais au Maroc —
-    centres d'appels, relation client, vente — et nous les comparons automatiquement
-    à votre profil.
+    Linkrs Marokko automatise la mise en relation entre les talents néerlandophones
+    du monde entier et les entreprises qui recrutent au Maroc. Nous collectons les
+    offres chaque jour et les comparons intelligemment à votre profil pour vous aider
+    à décrocher votre prochaine opportunité sur le marché marocain.
   </p>
-    <div class="cta-row">
-    <a class="btn" href="/upload">Déposer mon CV</a>
-  </div>
-  <p class="hint">Une connexion Google est requise pour retrouver votre profil
-     et suivre vos candidatures.</p>
-  <p class="hint">Connectez-vous pour suivre vos candidatures et retrouver votre profil.</p>
 </section>
+
+<div class="cta-row-large">
+  <a class="cta-card" href="/upload">
+    <img class="cta-logo" src="{{ url_for('static', path='logo.png') }}" alt="Linkrs Marokko">
+    <h2>Déposer mon CV</h2>
+    <p>Uploadez votre CV, nous l'analysons et vous proposons les meilleures correspondances.</p>
+    <span class="btn">Commencer</span>
+  </a>
+
+  <a class="cta-card" href="https://t.me/linkrsmorocco">
+    <span class="cta-icon tg">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+      </svg>
+    </span>
+    <h2>Nous contacter</h2>
+    <p>Une question ou une offre à publier ? Écrivez-nous directement sur Telegram.</p>
+    <span class="btn btn-tg">Via Telegram</span>
+  </a>
+</div>
 
 <div class="steps">
   <div class="step">

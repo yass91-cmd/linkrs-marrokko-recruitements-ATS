@@ -1,0 +1,66 @@
+{% extends "admin/_base_admin.html" %}
+{% block title %}Nouvelle offre — Espace recruteur{% endblock %}
+
+{% block admin_content %}
+<p class="crumb"><a href="/admin/jobs">← Toutes les offres</a></p>
+<h1>Nouvelle offre</h1>
+
+{% if error %}
+<div class="warnings"><strong>{{ error }}</strong></div>
+{% endif %}
+
+<div class="card">
+  <h2>Coller une annonce</h2>
+  <p class="hint">Copiez le texte complet depuis Indeed ou un autre site — titre,
+     entreprise, ville et description. Tout est extrait automatiquement.</p>
+  <form action="/admin/jobs/paste" method="post"
+        onsubmit="this.querySelector('button').disabled = true;
+                  this.querySelector('button').textContent = '⏳ Analyse en cours…';">
+    <label>
+      <textarea name="raw" rows="14"
+                placeholder="Collez ici l'annonce entière…">{{ form.description or '' }}</textarea>
+    </label>
+    <label>Lien de l'annonce <span class="hint">(optionnel)</span>
+      <input name="apply_link" placeholder="https://ma.indeed.com/…">
+    </label>
+    <button class="btn" type="submit">Créer l'offre depuis le texte</button>
+  </form>
+</div>
+
+<p class="hint" style="text-align:center;margin:26px 0 0">ou saisissez l'offre à la main</p>
+
+<div class="card">
+  <form action="/admin/jobs/new" method="post">
+    <input type="hidden" name="details_json" value="{{ details | tojson if details else '' }}">
+
+    <label>Poste *
+      <input name="title" required value="{{ form.title or '' }}"
+             placeholder="ex. Conseiller clientèle néerlandophone">
+    </label>
+
+    <div class="grid2">
+      <label>Entreprise
+        <input name="employer" value="{{ form.employer or '' }}" placeholder="ex. Intelcia">
+      </label>
+      <label>Ville
+        <input name="city" value="{{ form.city or '' }}" placeholder="ex. Casablanca">
+      </label>
+    </div>
+
+    <label class="check">
+      <input type="checkbox" name="is_remote"> Télétravail
+    </label>
+
+    <label>Lien de candidature
+      <input name="apply_link" value="{{ form.apply_link or '' }}" placeholder="https://…">
+    </label>
+
+    <label>Description
+      <textarea name="description" rows="10"
+                placeholder="Missions, exigences, langues demandées…">{{ form.description or '' }}</textarea>
+    </label>
+
+    <button class="btn-secondary" type="submit">Créer l'offre</button>
+  </form>
+</div>
+{% endblock %}

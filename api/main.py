@@ -15,6 +15,7 @@ from ingest.extractor import extract_text, ExtractionError
 from extract.cv_parser import parse_cv
 from db.candidates_repo import save_candidate
 from db.database import get_connection
+from db.storage import upload_cv_file
 from match.embeddings import embed
 from match.build_embeddings import candidate_to_text
 from api.admin import router as admin_router
@@ -26,6 +27,11 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_MB = 10
 ALLOWED = {".pdf", ".docx", ".jpg", ".jpeg", ".png"}
+CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+}
 
 # A missing secret must stop the application, never silently fall back to an
 # insecure default — a known signing key means forgeable sessions.
@@ -36,6 +42,8 @@ if not SESSION_SECRET:
 app = FastAPI(title="CV Matcher — Linkrs Morocco")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+
 
 app.add_middleware(
     SessionMiddleware,
@@ -65,6 +73,19 @@ def _embed_candidate(candidate_id: int, row: dict) -> None:
         conn.commit()
 
 
+def _drop_matches(candidate_id: int) -> None:
+    """Throw away assessments of a profile that no longer exists.
+
+    A match stores the reasoning about a specific CV. Once that CV is replaced,
+    the reasoning describes someone else — a recruiter reading it would be
+    looking at another person's strengths under this candidate's name.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM matches WHERE candidate_id = %s;", (candidate_id,))
+        conn.commit()
+
+
 def _lines(value: str | None) -> list[str]:
     """Turn a textarea (one item per line) into a list."""
     return [line.strip() for line in (value or "").splitlines() if line.strip()]
@@ -83,11 +104,11 @@ def _zip_rows(form, keys: list[str], names: list[str]) -> list[dict]:
 # --------------------------------------------------------------------------
 # public routes
 # --------------------------------------------------------------------------
-
+TELEGRAM_BOT = os.getenv("TELEGRAM_BOT", "")
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse(request, "index.html")
-
+    return templates.TemplateResponse(request, "index.html",
+                                      {"telegram_bot": TELEGRAM_BOT})
 
 @app.get("/upload", response_class=HTMLResponse)
 def upload_form(request: Request):
@@ -119,8 +140,10 @@ async def upload(request: Request, file: UploadFile = File(...)):
             {"message": f"Fichier trop volumineux (maximum {MAX_UPLOAD_MB} Mo)."},
         )
 
-    # The ingestion layer works on file paths. The original CV is deliberately
-    # NOT retained on the server once processed (data minimisation).
+    # The ingestion layer works on file paths, so the upload is still staged
+    # to a temp file for extraction — but the original bytes are also kept,
+    # in a private Storage bucket, so a recruiter can see exactly what the
+    # candidate sent alongside what the pipeline extracted from it.
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     try:
         tmp.write(contents)
@@ -134,7 +157,17 @@ async def upload(request: Request, file: UploadFile = File(...)):
         candidate.email = verified_email
         candidate.warnings = [w for w in candidate.warnings if "mail" not in w.lower()]
 
-        candidate_id = save_candidate(candidate, source_method=method, raw_text=text)
+        file_path = upload_cv_file(
+            contents,
+            file_path=f"{verified_email}/{file.filename or ('cv' + suffix)}",
+            content_type=CONTENT_TYPES.get(suffix, "application/octet-stream"),
+        )
+
+        candidate_id, inserted = save_candidate(candidate, source_method=method,
+                                                raw_text=text, file_path=file_path)
+        # A replaced profile invalidates every assessment made about the old one.
+        if not inserted:
+            _drop_matches(candidate_id)
         _embed_candidate(candidate_id, candidate.model_dump())
 
     except ExtractionError as e:
@@ -208,5 +241,7 @@ async def update_candidate(request: Request, candidate_id: int):
     # The profile text changed, so the embedding must be recomputed —
     # otherwise matching would still use the uncorrected data.
     _embed_candidate(candidate_id, row)
+    # Scores were computed against the old text; they no longer describe this CV.
+    _drop_matches(candidate_id)
 
     return templates.TemplateResponse(request, "confirmed.html", {"name": row["name"]})

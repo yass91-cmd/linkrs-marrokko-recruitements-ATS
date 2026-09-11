@@ -1,0 +1,40 @@
+{% extends "admin/_base_admin.html" %}
+{% block title %}Recrutements — Espace recruteur{% endblock %}
+
+{% block admin_content %}
+<h1>Recrutements</h1>
+
+<div class="stat-solo">
+  <span class="label">Candidats placés</span>
+  <span class="value">{{ rows | length }}</span>
+</div>
+
+<div class="card">
+  {% if not rows %}
+    <p class="hint">Aucun recrutement pour le moment.</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr><th>Nom</th><th>Poste</th><th>Entreprise</th><th>Ville</th><th>Date</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><a href="/admin/candidates/{{ r.candidate_id }}">{{ r.candidate or "Sans nom" }}</a></td>
+        <td><a href="/admin/jobs/{{ r.job_uid }}">{{ r.job }}</a></td>
+        <td>{{ r.employer or "—" }}</td>
+        <td>{{ r.city or "—" }}</td>
+        <td class="hint">{{ r.updated_at.strftime("%d/%m/%Y") if r.updated_at else "—" }}</td>
+        <td>
+          <form action="/admin/placements/{{ r.id }}/remove" method="post"
+                onsubmit="return confirm('Retirer ce recrutement ? Le candidat repassera à traiter.');">
+            <button class="btn-icon" type="submit" title="Retirer">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

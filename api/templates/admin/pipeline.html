@@ -11,52 +11,113 @@
 
 <div class="board-scroll">
   <div class="board">
-    {% for key, label in stages %}
+
     <div class="col">
-      <div class="col-head">{{ label }} <span class="count">{{ board[key] | length }}</span></div>
+      <div class="col-head">À traiter <span class="count">{{ pool | length }}</span></div>
 
-      {% for m in board[key] %}
-      <div class="kcard {{ 'blocked' if not m.eligible }}">
-        <a href="/admin/candidates/{{ m.candidate_id }}"><strong>{{ m.candidate }}</strong></a>
-        <div class="hint">{{ m.job }}</div>
-        <div class="hint">{{ m.employer or "—" }} · {{ m.city or "—" }}</div>
-        <div class="kfoot">
-          <span class="score {{ 'good' if m.llm_score and m.llm_score >= 70 }}">{{ m.llm_score }}</span>
-          {% if not m.eligible %}<span class="pill warn">bloqué</span>{% endif %}
-        </div>
-        <form action="/admin/matches/{{ m.id }}/status" method="post" class="inline">
-          <input type="hidden" name="redirect_to" value="/admin/pipeline?eligible={{ eligible }}">
-          <select name="status" onchange="this.form.submit()">
-            {% for s in ["suggested","presented","approved","declined","applied","hired","rejected"] %}
-            <option value="{{ s }}" {{ "selected" if s == m.status }}>{{ s }}</option>
-            {% endfor %}
-          </select>
-        </form>
+      <form action="/admin/pipeline" method="get" class="picker-search">
+        <input type="hidden" name="eligible" value="{{ eligible }}">
+        <input name="q" value="{{ q }}" placeholder="Rechercher un candidat…">
+      </form>
+
+      <ul class="picker-list">
+        {% for c in pool %}
+        <li>
+          {% if c.active_job %}
+          <span class="pick-row static">
+            <span>{{ c.name or "Sans nom" }}</span>
+            <span class="tag-sm tag-encours">en cours</span>
+          </span>
+          {% else %}
+          <form action="/admin/candidates/{{ c.candidate_id }}/suggest" method="post">
+            <input type="hidden" name="top" value="3">
+            <input type="hidden" name="q" value="{{ q }}">
+            <button type="submit" class="pick-row">
+              <span>{{ c.name or "Sans nom" }}</span>
+              {% if c.shortlisted %}
+                <span class="tag-sm tag-shortlist">à choisir</span>
+              {% else %}
+                <span class="tag-sm tag-nontraite">non traité</span>
+              {% endif %}
+            </button>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+        {% if not pool %}<li class="empty">Aucun candidat</li>{% endif %}
+      </ul>
+    </div>
+
+    {% for key, label, statuses in stages %}
+    <div class="col">
+      <div class="col-head">
+        {{ label }}
+        <span class="count">{{ shortlist | length if key == 'suggested' else board[key] | length }}</span>
       </div>
-      {% endfor %}
 
-      {% if not board[key] %}<p class="empty">—</p>{% endif %}
+      {% if key == 'suggested' %}
+
+        {% for s in shortlist %}
+        <div class="kcard">
+          <div class="kcard-head">
+            <a href="/admin/candidates/{{ s.candidate_id }}"><strong>{{ s.name or "Sans nom" }}</strong></a>
+          </div>
+
+          <form action="/admin/matches/pick" method="post">
+            <input type="hidden" name="candidate_id" value="{{ s.candidate_id }}">
+            <select name="match_id"
+                    onchange="this.nextElementSibling.href='/admin/jobs/'+this.selectedOptions[0].dataset.uid">
+              {% for jb in s.jobs %}
+              <option value="{{ jb.id }}" data-uid="{{ jb.job_uid }}">{{ jb.llm_score if jb.llm_score is not none else "–" }} — {{ jb.job }}{% if jb.employer %} · {{ jb.employer }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <a class="job-link" href="/admin/jobs/{{ s.jobs[0].job_uid }}"
+               target="_blank" rel="noopener">↗ Voir l'offre complète</a>
+            <button class="btn-sm" type="submit">✓ Choisir ce poste</button>
+          </form>
+        </div>
+        {% endfor %}
+        {% if not shortlist %}<p class="empty">—</p>{% endif %}
+
+      {% else %}
+
+        {% for m in board[key] %}
+        <div class="kcard {{ 'blocked' if m.eligible is false }}">
+          <div class="kcard-head">
+            <a href="/admin/candidates/{{ m.candidate_id }}"><strong>{{ m.candidate }}</strong></a>
+            {% if key in ['hired', 'declined'] %}
+            <form action="/admin/matches/{{ m.id }}/clear" method="post">
+              <button class="btn-icon" type="submit"
+                      title="{{ 'Retirer du tableau' if key == 'hired' else 'Renvoyer à traiter' }}">✕</button>
+            </form>
+            {% endif %}
+          </div>
+
+          <div class="hint">
+            <a class="job-link" href="/admin/jobs/{{ m.job_uid }}" target="_blank" rel="noopener">{{ m.job }} ↗</a>
+          </div>
+          <div class="hint">{{ m.employer or "—" }} · {{ m.city or "—" }}</div>
+          <div class="kfoot">
+            <span class="score {{ 'good' if m.llm_score and m.llm_score >= 70 }}">{{ m.llm_score if m.llm_score is not none else "–" }}</span>
+            {% if m.eligible is false %}<span class="pill warn">bloqué</span>{% endif %}
+          </div>
+
+          <form action="/admin/matches/{{ m.id }}/status" method="post" class="inline">
+            <input type="hidden" name="redirect_to" value="/admin/pipeline?eligible={{ eligible }}&q={{ q }}">
+            <select name="status" onchange="this.form.submit()">
+              {% for value, text in status_choices %}
+              <option value="{{ value }}" {{ "selected" if value == m.status }}>{{ text }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+        {% endfor %}
+        {% if not board[key] %}<p class="empty">—</p>{% endif %}
+
+      {% endif %}
     </div>
     {% endfor %}
+
   </div>
 </div>
-
-{% if closed %}
-<div class="card">
-  <h2>Clôturés</h2>
-  <table>
-    <thead><tr><th>Candidat</th><th>Poste</th><th>Score</th><th>Issue</th></tr></thead>
-    <tbody>
-      {% for m in closed %}
-      <tr>
-        <td><a href="/admin/candidates/{{ m.candidate_id }}">{{ m.candidate }}</a></td>
-        <td>{{ m.job }}</td>
-        <td>{{ m.llm_score }}</td>
-        <td><span class="pill">{{ m.status }}</span></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
 {% endblock %}

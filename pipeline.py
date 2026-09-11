@@ -7,7 +7,7 @@ from db.candidates_repo import save_candidate
 def process_cv(path: str) -> int:
     text, method = extract_text(path, with_method=True)
     candidate = parse_cv(text, source_is_ocr=(method == "ocr"))
-    candidate_id = save_candidate(candidate, source_method=method, raw_text=text)
+    candidate_id, _ = save_candidate(candidate, source_method=method, raw_text=text)
     return candidate_id
 
 

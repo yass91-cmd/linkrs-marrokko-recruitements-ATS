@@ -5,3 +5,4 @@ __pycache__/
 data/*.pdf
 data/*.docx
 .DS_Store
+.mcp.json

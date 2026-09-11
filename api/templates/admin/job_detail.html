@@ -3,6 +3,13 @@
 
 {% block admin_content %}
 <p class="crumb"><a href="/admin/jobs">← Toutes les offres</a></p>
+{% if locked %}
+<div class="warnings">
+  <strong>Suppression refusée.</strong> Un candidat est en cours ou a été recruté
+  sur cette offre — la supprimer effacerait son dossier.
+</div>
+{% endif %}
+
 <h1>{{ j.title }}</h1>
 <p class="lede">{{ j.employer or "Entreprise non précisée" }} · {{ j.city or "—" }}
   {% if j.is_remote %}· télétravail{% endif %}</p>
@@ -10,7 +17,69 @@
 <div class="split">
   <div>
     <div class="card">
-      <h2>Données collectées <span class="hint">(source : offre en ligne)</span></h2>
+      {% if edit %}
+      <div class="card-head">
+        <h2>Modifier l'offre</h2>
+        <a class="btn-sm" href="/admin/jobs/{{ j.job_uid }}">Annuler</a>
+      </div>
+      <form action="/admin/jobs/{{ j.job_uid }}/edit" method="post">
+        <label>Poste *
+          <input name="title" required value="{{ j.title or '' }}">
+        </label>
+
+        <label>Lien de candidature
+          <input name="apply_link" value="{{ j.apply_link or '' }}" placeholder="https://…">
+        </label>
+
+        <label class="check">
+          <input type="checkbox" name="is_remote" {{ "checked" if j.is_remote }}>
+          Télétravail
+        </label>
+
+        <label>Langues requises <span class="hint">(une par ligne)</span>
+          <textarea name="languages" rows="3">{{ d.languages | join("\n") }}</textarea>
+        </label>
+
+        <div class="grid2">
+          <label>Contrat
+            <input name="contract_type" value="{{ d.contract_type or '' }}">
+          </label>
+          <label>Expérience
+            <input name="experience_required" value="{{ d.experience_required or '' }}">
+          </label>
+          <label>Horaires
+            <input name="schedule" value="{{ d.schedule or '' }}">
+          </label>
+          <label>Salaire annoncé
+            <input name="salary" value="{{ d.salary or '' }}">
+          </label>
+        </div>
+
+        <label>Missions <span class="hint">(une par ligne)</span>
+          <textarea name="missions" rows="7">{{ d.missions | join("\n") }}</textarea>
+        </label>
+
+        <label>Exigences <span class="hint">(une par ligne)</span>
+          <textarea name="requirements" rows="6">{{ d.requirements | join("\n") }}</textarea>
+        </label>
+
+        <label>Avantages <span class="hint">(un par ligne)</span>
+          <textarea name="benefits" rows="5">{{ d.benefits | join("\n") }}</textarea>
+        </label>
+
+        <label>Description brute
+          <textarea name="description" rows="10">{{ j.description or '' }}</textarea>
+        </label>
+
+        <button class="btn" type="submit">Enregistrer</button>
+      </form>
+
+      {% else %}
+      <div class="card-head">
+        <h2>Données collectées <span class="hint">(source : offre en ligne)</span></h2>
+        <a class="btn-icon" href="/admin/jobs/{{ j.job_uid }}?edit=1"
+           title="Modifier l'offre">✏️</a>
+      </div>
 
       {% if d.languages %}
       <h3>Langues requises</h3>
@@ -47,6 +116,7 @@
       {% if j.apply_link %}
       <p style="margin-top:16px"><a class="hint" href="{{ j.apply_link }}" target="_blank" rel="noopener">Voir l'offre d'origine ↗</a></p>
       {% endif %}
+      {% endif %}
     </div>
   </div>
 
@@ -61,6 +131,14 @@
         {% if j.hr_verified_at %}
         <p class="hint">Vérifiée le {{ j.hr_verified_at.strftime("%d/%m/%Y") }}</p>
         {% endif %}
+
+        <label>Entreprise
+          <input name="employer" value="{{ j.employer or '' }}" placeholder="souvent absente de l'annonce">
+        </label>
+
+        <label>Ville
+          <input name="city" value="{{ j.city or '' }}" placeholder="ex. Casablanca">
+        </label>
 
         <label>Salaire confirmé
           <input name="hr_salary" value="{{ j.hr_salary or '' }}" placeholder="ex. 8000–9500 MAD net + primes">
@@ -84,11 +162,18 @@
 
         <button class="btn" type="submit">Enregistrer</button>
       </form>
+      {% if placed %}
+      <p class="hint" style="margin-top:14px">
+        🔒 Un candidat est en cours ou a été recruté sur cette offre : elle ne
+        peut pas être supprimée sans effacer son dossier.
+      </p>
+      {% else %}
       <form action="/admin/jobs/{{ j.job_uid }}/delete" method="post"
             onsubmit="return confirm('Supprimer définitivement cette offre et ses matchs ?');"
             style="margin-top:14px">
         <button class="btn-danger" type="submit">🗑 Supprimer l'offre</button>
       </form>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -100,24 +185,67 @@
       <input type="hidden" name="top" value="3">
       <button class="btn" type="submit">🔍 Trouver des candidats</button>
     </form>
-</div>
+  </div>
+
   {% if not candidates %}
-    <p class="hint">Aucun candidat évalué. Le matching inverse (offre → candidats) arrive.</p>
+    <p class="hint">Aucun candidat évalué. Lancez le matching inverse pour en trouver.</p>
   {% else %}
-  <table>
-    <thead><tr><th>Candidat</th><th>Score</th><th>Éligible</th><th>Statut</th></tr></thead>
-    <tbody>
-      {% for c in candidates %}
-      <tr>
-        <td><a href="/admin/candidates/{{ c.candidate_id }}">{{ c.name }}</a>
-            <div class="hint">{{ c.title or "" }}</div></td>
-        <td><span class="score {{ 'good' if c.llm_score and c.llm_score >= 70 }}">{{ c.llm_score }}</span></td>
-        <td>{{ "✅" if c.eligible else "⛔" }}</td>
-        <td><span class="pill">{{ c.status }}</span></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <form action="/admin/jobs/{{ j.job_uid }}/present" method="post">
+    <table class="ranking">
+      <thead>
+        <tr>
+          <th style="width:32px"></th>
+          <th>Candidat</th><th>Score</th><th>Éligible</th><th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in candidates %}
+        <tr>
+          <td><input type="checkbox" name="match_ids" value="{{ c.id }}"></td>
+          <td>
+            <a href="/admin/candidates/{{ c.candidate_id }}">{{ c.name }}</a>
+            <div class="hint">{{ c.title or "" }}</div>
+          </td>
+          <td><span class="score {{ 'good' if c.llm_score and c.llm_score >= 70 }}">{{ c.llm_score if c.llm_score is not none else "–" }}</span></td>
+          <td>{{ "✅" if c.eligible else "⛔" }}</td>
+          <td><span class="pill">{{ c.status }}</span></td>
+        </tr>
+
+        {% if c.summary or c.strengths or c.gaps or c.blocking_reasons %}
+        <tr class="why">
+          <td></td>
+          <td colspan="4">
+            <details>
+              <summary class="hint">Pourquoi ce score ?</summary>
+
+              {% if c.summary %}<p class="summary">{{ c.summary }}</p>{% endif %}
+
+              {% if c.strengths %}
+              <p class="hint" style="margin-bottom:2px"><strong>✅ Compétences acquises</strong></p>
+              <ul class="plain">{% for s in c.strengths %}<li>{{ s }}</li>{% endfor %}</ul>
+              {% endif %}
+
+              {% if c.gaps %}
+              <p class="hint" style="margin:12px 0 2px"><strong>⚠️ Ce qui manque</strong></p>
+              <ul class="plain">{% for g in c.gaps %}<li>{{ g }}</li>{% endfor %}</ul>
+              {% endif %}
+
+              {% if c.blocking_reasons %}
+              <p class="hint" style="margin:12px 0 2px"><strong>⛔ Bloquant</strong></p>
+              <ul class="plain">{% for b in c.blocking_reasons %}<li>{{ b }}</li>{% endfor %}</ul>
+              {% endif %}
+            </details>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <p style="margin-top:16px">
+      <button class="btn" type="submit">Présenter la sélection à l'HR</button>
+    </p>
+  </form>
   {% endif %}
 </div>
+
 {% endblock %}
